@@ -3,417 +3,343 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SVG & Typography Warper | Minimal UI</title>
+    <title>SberDevices SVG Warper | Pro Studio</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
     <style>
         :root {
-            /* Чистая светлая палитра */
-            --bg-main: #ffffff;
-            --bg-panel: #ffffff;
-            --bg-element: #F5F5F7; /* Светло-серый для инпутов и рабочей области */
-            --border-color: #EBEBEB;
-            
-            /* Акценты из референса */
-            --accent-blue: #005BFF;
-            --accent-green: #24B23E;
-            --text-main: #080808;
-            --text-muted: #8E8E93;
-            
-            /* Здесь потом пропишем SB Sans */
-            --font-interface: system-ui, -apple-system, sans-serif;
-            --font-sticker: 'Arial Black', Impact, sans-serif;
+            --bg-element: #F5F5F7; --border-color: #EBEBEB; --accent-blue: #005BFF;
+            --text-main: #080808; --text-muted: #8E8E93;
+            --font-ui: system-ui, -apple-system, sans-serif;
+            --font-sticker: 'Arial Black', Impact, sans-serif; 
+            --grid-color: rgba(0, 0, 0, 0.08);
+            --custom-svg-fill: #54FF45; 
         }
+        * { box-sizing: border-box; font-family: var(--font-ui); }
+        body { margin: 0; padding: 0; background: var(--bg-element); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
 
-        * { 
-            box-sizing: border-box; 
-            font-family: var(--font-interface); 
-        }
-
-        body {
-            margin: 0; 
-            padding: 0; 
-            background-color: var(--bg-element);
-            color: var(--text-main); 
-            display: flex; 
-            height: 100vh; 
-            overflow: hidden;
-        }
-
-        /* Боковая панель управления */
-        .sidebar {
-            width: 420px; 
-            flex-shrink: 0; 
-            background: var(--bg-panel);
-            border-right: 1px solid var(--border-color);
-            display: flex; 
-            flex-direction: column;
-            overflow-y: auto;
-            padding: 32px;
-            gap: 32px;
-            box-shadow: 2px 0 12px rgba(0,0,0,0.02);
-            z-index: 10;
-        }
-
+        .sidebar { width: 440px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow-y: auto; padding: 24px; gap: 20px; z-index: 10; }
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-thumb { background: #D1D1D6; border-radius: 3px; }
 
-        /* Рабочая область (как карточка товара) */
-        .viewport {
-            flex-grow: 1; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center;
-            overflow: hidden; 
-            position: relative;
-            background-color: var(--bg-element);
-        }
+        /* Вкладки режимов */
+        .tabs { display: flex; background: var(--bg-element); border-radius: 12px; padding: 4px; margin-bottom: 10px; }
+        .tab-btn { flex: 1; padding: 10px; text-align: center; border-radius: 8px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text-muted); transition: 0.2s; font-size: 13px; }
+        .tab-btn.active { background: #fff; color: var(--text-main); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
-        /* Заголовки разделов */
-        .section-title {
-            font-size: 18px; 
-            font-weight: 600;
-            color: var(--text-main); 
-            margin: 0 0 20px 0;
-            letter-spacing: -0.02em;
-        }
-
-        .control-group { 
-            margin-bottom: 16px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 8px; 
-        }
-        
-        .control-row { 
-            display: flex; 
-            justify-content: space-between; 
-            font-size: 14px; 
-            font-weight: 500;
-        }
-        
-        .control-row span:last-child { 
-            color: var(--text-muted); 
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* Инпуты и контроллеры */
-        input[type="range"] { 
-            width: 100%; 
-            accent-color: var(--accent-blue); 
-            cursor: pointer; 
-            height: 4px;
-            background: #E5E5EA;
-            border-radius: 2px;
-            appearance: none;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            background: #fff;
-            border: 2px solid var(--accent-blue);
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        input[type="text"], textarea, select {
-            width: 100%; 
-            background: var(--bg-element); 
-            border: 1px solid transparent;
-            border-radius: 12px; 
-            padding: 12px 16px; 
-            color: var(--text-main); 
-            font-size: 14px; 
-            outline: none;
-            transition: all 0.2s;
-            resize: vertical;
-        }
-        
-        input[type="text"]:focus, textarea:focus, select:focus {
-            border-color: var(--accent-blue);
-            background: #ffffff;
-            box-shadow: 0 0 0 3px rgba(0, 91, 255, 0.1);
-        }
+        .section-title { font-size: 16px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin: 0 0 12px 0; }
+        .control-group { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .control-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; }
+        .control-row span:last-child { color: var(--accent-blue); font-variant-numeric: tabular-nums; }
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        input[type="range"] { width: 100%; accent-color: var(--accent-blue); height: 4px; background: #E5E5EA; border-radius: 2px; appearance: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border: 2px solid var(--accent-blue); border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        textarea, select { width: 100%; background: var(--bg-element); border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; font-size: 14px; outline: none; resize: none; text-align: center; }
+        textarea:focus, select:focus { border-color: var(--accent-blue); background: #fff; }
+        input[type="color"] { border: none; width: 100%; height: 36px; border-radius: 8px; cursor: pointer; background: none; padding: 0; }
+
+        .file-upload-btn { display: inline-flex; justify-content: center; align-items: center; background: var(--bg-element); border: 1px dashed #A1A1AA; border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; width: 100%; transition: 0.2s; color: var(--text-main); }
+        .file-upload-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: #F0F4FF; }
+        input[type="file"] { display: none; }
+
+        .btn-export { background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 16px; font-weight: 600; font-size: 15px; cursor: pointer; width: 100%; transition: 0.1s; margin-top: auto; }
+        .btn-export:active { transform: scale(0.98); }
+
+        .preset-btn { width: 100%; padding: 12px; text-align: center; background: var(--bg-element); border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; color: var(--text-main); }
+        .preset-btn:hover { border-color: var(--accent-blue); background: #F0F4FF; color: var(--accent-blue); }
+
+        /* Рабочая область */
+        .viewport { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; background: radial-gradient(circle at center, #ffffff 0%, #E5E5EA 100%); }
+        #scene { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; perspective: 400px; overflow: hidden; }
+        #grid-floor { position: absolute; width: 4000px; height: 4000px; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: 50px 50px; background-position: center; transform: translateY(250px) rotateX(90deg); opacity: 0.6; pointer-events: none; }
         
-        .color-picker-wrapper {
-            display: flex; align-items: center; gap: 12px; 
-            background: var(--bg-element);
-            padding: 8px 12px; 
-            border-radius: 12px; 
-        }
+        #transform-wrapper { transform-style: preserve-3d; will-change: transform; z-index: 2; position: relative; }
+        #sticker-target { position: relative; display: inline-flex; justify-content: center; align-items: center; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
         
-        input[type="color"] { 
-            border: none; 
-            width: 28px; 
-            height: 28px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            background: none; 
-            padding: 0;
-        }
+        /* Слои генератора */
+        #content-layer { position: relative; z-index: 2; font-family: var(--font-sticker); font-weight: 900; line-height: 1.1; white-space: pre-wrap; text-align: center; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease; }
+        #custom-svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        #custom-svg-layer svg { width: 100%; height: 100%; display: block; }
+        #custom-svg-layer path, #custom-svg-layer rect, #custom-svg-layer polygon { fill: var(--custom-svg-fill) !important; transition: fill 0.2s; }
 
-        /* Кнопки */
-        .btn {
-            background: var(--accent-blue); 
-            color: #ffffff; 
-            border: none;
-            padding: 16px; 
-            border-radius: 24px; 
-            font-weight: 600; 
-            font-size: 15px;
-            cursor: pointer;
-            transition: transform 0.1s, opacity 0.2s; 
-            text-align: center;
-            width: 100%;
-        }
-        
-        .btn:hover { opacity: 0.9; }
-        .btn:active { transform: scale(0.98); }
-
-        /* Рабочая область и элементы сцены */
-        #scene-container {
-            perspective: 400px;
-            perspective-origin: 50% 50%;
-            display: flex; justify-content: center; align-items: center;
-            width: 100%; height: 100%;
-        }
-
-        #transform-wrapper {
-            transform-style: preserve-3d;
-            will-change: transform;
-        }
-
-        /* Стили самого стикера */
-        #sticker-target {
-            position: relative;
-            padding: 24px 48px;
-            color: #000;
-            font-family: var(--font-sticker);
-            font-weight: 900;
-            font-size: 42px;
-            text-align: center;
-            line-height: 1.1;
-            white-space: pre-wrap;
-            display: inline-block;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.08); /* Мягкая тень для объема */
-        }
-
-        .shape-bubble { border-radius: 40px; }
-        .shape-bubble::after {
-            content: ''; position: absolute;
-            bottom: -15px; right: 40px;
-            border-width: 25px 25px 0 0;
-            border-style: solid;
-            border-bottom-color: transparent !important;
-            border-right-color: transparent !important;
-            border-left-color: transparent !important;
-        }
-        .shape-oval { border-radius: 50%; }
-        .shape-pill { border-radius: 100px; }
-        .shape-rect { border-radius: 16px; }
-
-        /* Скрываем скролл на текстовом поле, чтобы было опрятнее */
-        textarea::-webkit-scrollbar { display: none; }
+        /* Слой готового SVG */
+        #pure-svg-layer { display: block; }
+        #pure-svg-layer svg { max-width: 600px; max-height: 600px; display: block; }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <div>
-            <h2 class="section-title">Контент</h2>
+        
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-gen" onclick="setMode('generator')">Генератор</button>
+            <button class="tab-btn" id="tab-pure" onclick="setMode('pure')">Готовый SVG (Только 3D)</button>
+        </div>
+
+        <div id="mode-generator">
+            <div class="section-title">Ассеты</div>
             <div class="control-group">
-                <label class="control-row"><span>Текст плашки</span></label>
-                <textarea id="stickerText" rows="2">СКИДКА 99%\nНА ТЕЛЕВИЗОР</textarea>
+                <label class="file-upload-btn">
+                    <span id="font-name-label">🔤 Загрузить шрифт (.ttf, .otf, .woff)</span>
+                    <input type="file" id="fontInput" accept=".ttf,.otf,.woff,.woff2">
+                </label>
+            </div>
+            <div class="control-group">
+                <label class="file-upload-btn">
+                    <span id="svg-name-label">💠 Загрузить фон (Union.svg)</span>
+                    <input type="file" id="customShapeInput" accept=".svg">
+                </label>
+            </div>
+
+            <div class="section-title" style="margin-top: 15px;">Настройки плашки</div>
+            <div class="control-group">
+                <textarea id="gText" rows="2">СКИДКА 99%\nНА ТЕЛЕВИЗОР</textarea>
+            </div>
+            <div class="grid-2">
+                <div class="control-group"><label class="control-row"><span>Цвет фона</span></label><input type="color" id="gBg" value="#54FF45"></div>
+                <div class="control-group"><label class="control-row"><span>Цвет текста</span></label><input type="color" id="gTc" value="#000000"></div>
             </div>
             
+            <div class="control-group" style="margin-top: 10px;">
+                <label class="control-row"><span>Размер текста</span><span id="v-fs">65px</span></label>
+                <input type="range" id="gFs" min="20" max="100" value="65">
+            </div>
+
             <div class="grid-2">
                 <div class="control-group">
-                    <label class="control-row"><span>Форма</span></label>
-                    <select id="shapeType">
-                        <option value="shape-bubble">Баббл</option>
-                        <option value="shape-pill">Пилюля</option>
-                        <option value="shape-oval">Овал</option>
-                        <option value="shape-rect">Прямоугольник</option>
-                    </select>
+                    <label class="control-row"><span>Отступ (Бока)</span><span id="v-px">70px</span></label>
+                    <input type="range" id="gPx" min="-50" max="150" value="70">
                 </div>
                 <div class="control-group">
-                    <label class="control-row"><span>Заливка</span></label>
-                    <select id="fillType">
-                        <option value="solid">Сплошная</option>
-                        <option value="gradient">Градиент</option>
-                    </select>
+                    <label class="control-row"><span>Отступ (Верх)</span><span id="v-py">40px</span></label>
+                    <input type="range" id="gPy" min="-50" max="100" value="40">
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="control-group">
+                    <label class="control-row"><span>Кернинг</span><span id="v-kerning">-2px</span></label>
+                    <input type="range" id="gKerning" min="-10" max="10" value="-2">
+                </div>
+                <div class="control-group">
+                    <label class="control-row"><span>Спейсинг</span><span id="v-spacing">1.1</span></label>
+                    <input type="range" id="gSpacing" min="0.5" max="2" step="0.05" value="1.1">
                 </div>
             </div>
 
-            <div class="grid-2 color-controls">
+            <div class="control-group" style="margin-top: 15px;">
+                <label class="control-row" style="color: var(--accent-blue); margin-bottom: 5px;"><span>Смещение текста (X/Y)</span></label>
+                <input type="range" id="gOffX" min="-80" max="80" value="0">
+                <input type="range" id="gOffY" min="-80" max="80" value="-12" style="margin-top: 5px;">
+            </div>
+
+            <div class="section-title" style="margin-top: 15px;">Пресет</div>
+            <button class="preset-btn" onclick="applyA99()">Восстановить конфигурацию A99</button>
+        </div>
+
+        <div id="mode-pure" style="display: none;">
+            <div class="section-title">Готовый макет</div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Загрузите финальный SVG-файл, в котором уже объединены текст и плашка. Приложение применит к нему только настройки 3D-перспективы.</p>
+            <div class="control-group">
+                <label class="file-upload-btn" style="padding: 30px; border-style: dashed; border-color: var(--accent-blue);">
+                    <span id="pure-svg-label" style="color: var(--accent-blue);">+ Загрузить готовый SVG макет</span>
+                    <input type="file" id="pureSvgInput" accept=".svg">
+                </label>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 10px;">
+            <div class="section-title">Пространство (3D)</div>
+            <div class="control-group">
+                <label class="control-row"><span>Глубина искажения</span><span id="v-persp">400px</span></label>
+                <input type="range" id="sPersp" min="100" max="2000" value="400">
+            </div>
+            <div class="grid-2">
                 <div class="control-group">
-                    <label class="control-row"><span>Цвет фона</span></label>
-                    <div class="color-picker-wrapper"><input type="color" id="bgColor1" value="#24B23E"></div>
-                </div>
-                <div class="control-group" id="gradientColorGroup" style="display:none;">
-                    <label class="control-row"><span>Градиент</span></label>
-                    <div class="color-picker-wrapper"><input type="color" id="bgColor2" value="#005BFF"></div>
+                    <label class="control-row"><span>Поворот X</span><span id="v-rx">20°</span></label>
+                    <input type="range" id="sRx" min="-85" max="85" value="20">
                 </div>
                 <div class="control-group">
-                    <label class="control-row"><span>Цвет текста</span></label>
-                    <div class="color-picker-wrapper"><input type="color" id="textColor" value="#ffffff"></div>
+                    <label class="control-row"><span>Поворот Y</span><span id="v-ry">-35°</span></label>
+                    <input type="range" id="sRy" min="-85" max="85" value="-35">
                 </div>
             </div>
-            
             <div class="control-group" style="margin-top: 8px;">
-                <label class="control-row"><span>Размер шрифта</span><span id="val-fontSize">42px</span></label>
-                <input type="range" id="fontSize" min="20" max="100" value="42">
+                <label class="control-row"><span>Вращение Z</span><span id="v-rz">0°</span></label>
+                <input type="range" id="sRz" min="-180" max="180" value="0">
             </div>
         </div>
 
-        <div>
-            <h2 class="section-title">Пространство</h2>
-            
-            <div class="control-group">
-                <label class="control-row"><span>Глубина перспективы</span><span id="val-persp">400px</span></label>
-                <input type="range" id="persp" min="100" max="2000" value="400">
-            </div>
-
-            <div class="grid-2">
-                <div class="control-group">
-                    <label class="control-row"><span>Смещение X</span><span id="val-pox">100%</span></label>
-                    <input type="range" id="pox" min="-50" max="150" value="100">
-                </div>
-                <div class="control-group">
-                    <label class="control-row"><span>Смещение Y</span><span id="val-poy">50%</span></label>
-                    <input type="range" id="poy" min="-50" max="150" value="50">
-                </div>
-            </div>
-
-            <div class="control-group" style="margin-top: 24px;">
-                <label class="control-row"><span>Наклон (X)</span><span id="val-rx">15°</span></label>
-                <input type="range" id="rx" min="-80" max="80" value="15">
-            </div>
-            <div class="control-group">
-                <label class="control-row"><span>Поворот (Y)</span><span id="val-ry">-35°</span></label>
-                <input type="range" id="ry" min="-80" max="80" value="-35">
-            </div>
-            <div class="control-group">
-                <label class="control-row"><span>Вращение (Z)</span><span id="val-rz">5°</span></label>
-                <input type="range" id="rz" min="-180" max="180" value="5">
-            </div>
-        </div>
-
-        <div style="margin-top:auto;">
-            <button class="btn" id="btnPng">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Сохранить PNG
-            </button>
-        </div>
+        <button class="btn-export" id="btnPng">Сохранить PNG</button>
     </div>
 
     <div class="viewport">
-        <div id="scene-container">
+        <div id="scene">
+            <div id="grid-floor"></div>
             <div id="transform-wrapper">
-                <div id="sticker-target" class="shape-bubble">СКИДКА 99%<br>НА ТЕЛЕВИЗОР</div>
+                <div id="sticker-target">
+                    </div>
             </div>
         </div>
     </div>
 
     <script>
-        const scene = document.getElementById('scene-container');
+        const scene = document.getElementById('scene');
         const wrapper = document.getElementById('transform-wrapper');
         const target = document.getElementById('sticker-target');
         
-        const spatialParams = ['persp', 'pox', 'poy', 'rx', 'ry', 'rz'];
-        
-        function renderContent() {
-            const text = document.getElementById('stickerText').value.replace(/\\n/g, '\n');
-            const shape = document.getElementById('shapeType').value;
-            const fillType = document.getElementById('fillType').value;
-            const c1 = document.getElementById('bgColor1').value;
-            const c2 = document.getElementById('bgColor2').value;
-            const tc = document.getElementById('textColor').value;
-            const fs = document.getElementById('fontSize').value;
+        let currentMode = 'generator';
+        let customBgSVG = null;   // Фон для генератора (Union.svg)
+        let pureFullSVG = null;   // Готовый цельный макет
 
-            document.getElementById('gradientColorGroup').style.display = fillType === 'gradient' ? 'flex' : 'none';
+        // Переключение режимов
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('tab-gen').classList.toggle('active', mode === 'generator');
+            document.getElementById('tab-pure').classList.toggle('active', mode === 'pure');
+            document.getElementById('mode-generator').style.display = mode === 'generator' ? 'block' : 'none';
+            document.getElementById('mode-pure').style.display = mode === 'pure' ? 'block' : 'none';
+            renderScene();
+        }
 
-            target.innerText = text;
-            target.style.color = tc;
-            target.style.fontSize = fs + 'px';
-            document.getElementById('val-fontSize').innerText = fs + 'px';
+        // ================= ЗАГРУЗЧИКИ =================
+        // Шрифт
+        document.getElementById('fontInput').addEventListener('change', function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            document.getElementById('font-name-label').innerText = '✅ ' + file.name;
+            const reader = new FileReader(); reader.onload = function(e) {
+                const newStyle = document.createElement('style');
+                newStyle.appendChild(document.createTextNode(`@font-face { font-family: 'CustomFont'; src: url('${e.target.result}'); }`));
+                document.head.appendChild(newStyle); document.documentElement.style.setProperty('--font-sticker', "'CustomFont', sans-serif"); renderScene();
+            }; reader.readAsDataURL(file);
+        });
 
-            let backgroundStyle = c1;
-            if (fillType === 'gradient') {
-                backgroundStyle = `linear-gradient(135deg, ${c1}, ${c2})`;
-            }
-            target.style.background = backgroundStyle;
-            target.className = shape;
-            
-            if (shape === 'shape-bubble') {
-                target.style.setProperty('border-top-color', c1);
-                const styleSheet = document.styleSheets[0];
-                let ruleIndex = -1;
-                for(let i=0; i<styleSheet.cssRules.length; i++) {
-                    if(styleSheet.cssRules[i].selectorText === '.shape-bubble::after') ruleIndex = i;
+        // Фон для генератора (Union.svg)
+        document.getElementById('customShapeInput').addEventListener('change', function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            document.getElementById('svg-name-label').innerText = '✅ ' + file.name;
+            const reader = new FileReader(); reader.onload = function(e) {
+                const doc = new DOMParser().parseFromString(e.target.result, "image/svg+xml");
+                const svgEl = doc.querySelector('svg');
+                if (svgEl) { customBgSVG = { viewBox: svgEl.getAttribute('viewBox') || '0 0 100 100', content: svgEl.innerHTML }; renderScene(); } 
+            }; reader.readAsText(file);
+        });
+
+        // Готовый цельный макет (Режим 2)
+        document.getElementById('pureSvgInput').addEventListener('change', function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            document.getElementById('pure-svg-label').innerText = '✅ ' + file.name;
+            const reader = new FileReader(); reader.onload = function(e) {
+                pureFullSVG = e.target.result; renderScene();
+            }; reader.readAsText(file);
+        });
+
+        // ================= РЕНДЕР И МАТЕМАТИКА =================
+        function renderScene() {
+            target.style = ''; target.innerHTML = '';
+
+            if (currentMode === 'generator') {
+                const text = document.getElementById('gText').value.replace(/\\n/g, '\n');
+                const bg = document.getElementById('gBg').value;
+                const tc = document.getElementById('gTc').value;
+                const fs = document.getElementById('gFs').value;
+                const px = parseInt(document.getElementById('gPx').value);
+                const py = parseInt(document.getElementById('gPy').value);
+                const offX = document.getElementById('gOffX').value;
+                const offY = document.getElementById('gOffY').value;
+                const kerning = document.getElementById('gKerning').value;
+                const spacing = document.getElementById('gSpacing').value;
+
+                // Трюк с отрицательными отступами:
+                // Если значение > 0: используем padding (отталкиваем границы наружу)
+                // Если значение < 0: используем margin (стягиваем границы внутрь)
+                const padX = Math.max(0, px); const marX = Math.min(0, px);
+                const padY = Math.max(0, py); const marY = Math.min(0, py);
+
+                document.documentElement.style.setProperty('--custom-svg-fill', bg);
+
+                let bgLayer = '';
+                if (customBgSVG) {
+                    target.style.background = 'transparent';
+                    bgLayer = `<div id="custom-svg-layer"><svg viewBox="${customBgSVG.viewBox}" preserveAspectRatio="none">${customBgSVG.content}</svg></div>`;
+                } else {
+                    target.style.background = bg; target.style.borderRadius = '200px';
                 }
-                if(ruleIndex > -1) styleSheet.deleteRule(ruleIndex);
-                styleSheet.insertRule(`.shape-bubble::after { border-top-color: ${c1} !important; }`, styleSheet.cssRules.length);
+
+                target.innerHTML = `
+                    ${bgLayer}
+                    <div id="content-layer" style="
+                        color: ${tc}; font-size: ${fs}px; 
+                        letter-spacing: ${kerning}px; line-height: ${spacing};
+                        padding: ${padY}px ${padX}px; 
+                        margin: ${marY}px ${marX}px;
+                        transform: translate(${offX}px, ${offY}px);">
+                        ${text}
+                    </div>
+                `;
+
+                document.getElementById('v-fs').innerText = fs + 'px';
+                document.getElementById('v-px').innerText = px + 'px';
+                document.getElementById('v-py').innerText = py + 'px';
+                document.getElementById('v-kerning').innerText = kerning + 'px';
+                document.getElementById('v-spacing').innerText = spacing;
+
+            } else {
+                // Режим "Готовый макет"
+                if (pureFullSVG) {
+                    target.innerHTML = `<div id="pure-svg-layer">${pureFullSVG}</div>`;
+                    const svgNode = target.querySelector('svg');
+                    if (svgNode) { svgNode.style.width = '100%'; svgNode.style.height = '100%'; }
+                } else {
+                    target.innerHTML = `<div style="padding: 40px; background: #fff; border-radius: 20px; font-weight: bold; font-family: var(--font-ui);">Загрузите SVG справа 👉</div>`;
+                }
             }
-            applyPerspective();
+
+            apply3D();
         }
 
-        function applyPerspective() {
-            const p = {};
-            spatialParams.forEach(id => {
-                p[id] = document.getElementById(id).value;
-            });
-
-            document.getElementById('val-persp').innerText = p.persp + 'px';
-            document.getElementById('val-pox').innerText = p.pox + '%';
-            document.getElementById('val-poy').innerText = p.poy + '%';
-            document.getElementById('val-rx').innerText = p.rx + '°';
-            document.getElementById('val-ry').innerText = p.ry + '°';
-            document.getElementById('val-rz').innerText = p.rz + '°';
-
-            scene.style.perspective = `${p.persp}px`;
-            scene.style.perspectiveOrigin = `${p.pox}% ${p.poy}%`;
-
-            wrapper.style.transform = `
-                rotateX(${p.rx}deg)
-                rotateY(${p.ry}deg)
-                rotateZ(${p.rz}deg)
-            `;
+        // Пресет A99
+        function applyA99() {
+            document.getElementById('gText').value = "СКИДКА 99%\nНА ТЕЛЕВИЗОР";
+            document.getElementById('gBg').value = "#54FF45";
+            document.getElementById('gTc').value = "#000000";
+            document.getElementById('gFs').value = 65;
+            document.getElementById('gPx').value = 70;
+            document.getElementById('gPy').value = 40;
+            document.getElementById('gOffX').value = 0;
+            document.getElementById('gOffY').value = -12;
+            document.getElementById('gKerning').value = -2;
+            document.getElementById('gSpacing').value = 1.1;
+            document.getElementById('sRx').value = 20;
+            document.getElementById('sRy').value = -35;
+            document.getElementById('sRz').value = 0;
+            renderScene();
         }
 
-        spatialParams.forEach(id => {
-            document.getElementById(id).addEventListener('input', applyPerspective);
-        });
+        function apply3D() {
+            const p = document.getElementById('sPersp').value;
+            const rx = document.getElementById('sRx').value;
+            const ry = document.getElementById('sRy').value;
+            const rz = document.getElementById('sRz').value;
 
-        const inputs = ['stickerText', 'shapeType', 'fillType', 'bgColor1', 'bgColor2', 'textColor', 'fontSize'];
-        inputs.forEach(id => {
-            document.getElementById(id).addEventListener(id.includes('Color') || id === 'fontSize' || id === 'stickerText' ? 'input' : 'change', renderContent);
-        });
+            document.getElementById('v-persp').innerText = p + 'px';
+            document.getElementById('v-rx').innerText = rx + '°';
+            document.getElementById('v-ry').innerText = ry + '°';
+            document.getElementById('v-rz').innerText = rz + '°';
+
+            scene.style.perspective = p + 'px';
+            wrapper.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+        }
+
+        // Слушатели событий
+        ['gText', 'gBg', 'gTc', 'gFs', 'gPx', 'gPy', 'gOffX', 'gOffY', 'gKerning', 'gSpacing'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
+        ['sPersp', 'sRx', 'sRy', 'sRz'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
 
         document.getElementById('btnPng').addEventListener('click', () => {
-            domtoimage.toPng(scene, {
-                width: scene.offsetWidth * 2,
-                height: scene.offsetHeight * 2,
-                style: {
-                    transform: 'scale(2)',
-                    transformOrigin: 'top left'
-                }
-            })
-            .then(dataUrl => {
-                const link = document.createElement('a');
-                link.download = `sber-sticker-${Date.now()}.png`;
-                link.href = dataUrl;
-                link.click();
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Произошла ошибка при сохранении');
-            });
+            domtoimage.toPng(scene, { width: scene.offsetWidth * 2, height: scene.offsetHeight * 2, style: { transform: 'scale(2)', transformOrigin: 'top left' } })
+            .then(url => { const a = document.createElement('a'); a.download = `Sber-Render-${Date.now()}.png`; a.href = url; a.click(); });
         });
 
-        renderContent();
+        renderScene();
     </script>
 </body>
 </html>
