@@ -6,30 +6,42 @@
     <title>SberDevices SVG Warper | Pro Studio</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
     <style>
-        /* Базовое начертание для интерфейса */
+        /* 1. Базовое начертание для обычного текста интерфейса */
         @font-face {
-            font-family: 'Sber Sans';
+            font-family: 'SberSans';
             src: url('SBSansDisplay-Regular.otf') format('opentype');
             font-weight: 400; 
             font-style: normal;
         }
 
-        /* Начертание для плашки (Хакаем вес на 900) */
+        /* 2. Привязываем файл Medium к интерфейсу (кнопки, табы) */
         @font-face {
-            font-family: 'Sber Sans';
+            font-family: 'SberSans';
             src: url('SBSansDisplay-Medium.otf') format('opentype');
-            font-weight: 900; /* ИЗМЕНЕНО: теперь браузер отдаст этот шрифт плашке */
+            font-weight: 600; 
+            font-style: normal;
+        }
+
+        /* 3. Привязываем файл Medium к заголовкам интерфейса */
+        @font-face {
+            font-family: 'SberSans';
+            src: url('SBSansDisplay-Medium.otf') format('opentype');
+            font-weight: 700; 
+            font-style: normal;
+        }
+
+        /* 4. Привязываем файл Medium к самой плашке */
+        @font-face {
+            font-family: 'SberSans';
+            src: url('SBSansDisplay-Medium.otf') format('opentype');
+            font-weight: 900; 
             font-style: normal;
         }
 
         :root {
-            --bg-element: #F5F5F7; --border-color: #EBEBEB; --accent-blue: #005BFF;
-            --text-main: #080808; --text-muted: #8E8E93;
-            --font-ui: 'Sber Sans', system-ui, -apple-system, sans-serif;
-            --font-sticker: 'Sber Sans', Impact, sans-serif; 
-            --grid-color: rgba(0, 0, 0, 0.08);
-            --custom-svg-fill: #54FF45; 
-        }
+            --bg-element: #F5F5F7; 
+            --border-color: #EBEBEB; 
+            --accent-blue: #005BFF;
         }
         * { box-sizing: border-box; font-family: var(--font-ui); }
         body { margin: 0; padding: 0; background: var(--bg-element); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
