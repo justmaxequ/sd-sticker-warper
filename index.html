@@ -6,11 +6,27 @@
     <title>SberDevices SVG Warper | Pro Studio</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
     <style>
+        <style>
+    /* Базовое начертание для текста, инпутов и подписей */
+    @font-face {
+        font-family: 'Sber Sans';
+        src: url('SBSansDisplay-Regular.otf') format('otf');
+        font-weight: 400; /* Стандартный вес (Regular) */
+        font-style: normal;
+    }
+
+    /* Полужирное начертание для заголовков (section-title) и кнопок */
+    @font-face {
+        font-family: 'Sber Sans';
+        src: url('SBSansDisplay-Medium.otf') format('otf');
+        font-weight: 600; /* SemiBold (или 700 для Bold) */
+        font-style: normal;
+    }
         :root {
             --bg-element: #F5F5F7; --border-color: #EBEBEB; --accent-blue: #005BFF;
             --text-main: #080808; --text-muted: #8E8E93;
-            --font-ui: system-ui, -apple-system, sans-serif;
-            --font-sticker: 'Arial Black', Impact, sans-serif; 
+            --font-ui: 'Sber Sans', system-ui, sans-serif;
+            --font-sticker: 'Sber Sans', Impact, sans-serif;
             --grid-color: rgba(0, 0, 0, 0.08);
             --custom-svg-fill: #54FF45; 
         }
