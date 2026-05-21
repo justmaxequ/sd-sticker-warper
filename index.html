@@ -44,7 +44,6 @@
             --accent-blue: #005BFF;
             --text-main: #080808; 
             --text-muted: #8E8E93;
-            /* ВОТ ЭТИ ПЕРЕМЕННЫЕ ПОТЕРЯЛИСЬ: */
             --font-ui: 'SberSans', system-ui, -apple-system, sans-serif;
             --font-sticker: 'SberSans', Impact, sans-serif; 
             --grid-color: rgba(0, 0, 0, 0.08);
@@ -60,9 +59,9 @@
         .sidebar::-webkit-scrollbar-thumb { background: #D1D1D6; border-radius: 3px; }
 
         /* Вкладки режимов */
-        .tabs { display: flex; background: var(--bg-element); border-radius: 12px; padding: 4px; margin-bottom: 10px; }
-        .tab-btn { flex: 1; padding: 10px; text-align: center; border-radius: 8px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text-muted); transition: 0.2s; font-size: 13px; }
-        .tab-btn.active { background: #fff; color: var(--text-main); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tabs { display: flex; background: var(--border-color); border-radius: 12px; padding: 6px; margin-bottom: 10px; }
+        .tab-btn { flex: 1; padding: 12px; text-align: center; border-radius: 8px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: var(--text-muted); transition: 0.3s; font-size: 14px; }
+        .tab-btn.active { background: #fff; color: var(--accent-blue); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
         .section-title { font-size: 16px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin: 0 0 12px 0; }
         .control-group { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
@@ -81,11 +80,16 @@
         .file-upload-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: #F0F4FF; }
         input[type="file"] { display: none; }
 
-        .btn-export { background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 16px; font-weight: 600; font-size: 15px; cursor: pointer; width: 100%; transition: 0.1s; margin-top: auto; }
-        .btn-export:active { transform: scale(0.98); }
-
         .preset-btn { width: 100%; padding: 12px; text-align: center; background: var(--bg-element); border: 1px solid var(--border-color); border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; color: var(--text-main); }
         .preset-btn:hover { border-color: var(--accent-blue); background: #F0F4FF; color: var(--accent-blue); }
+
+        /* Кнопки экспорта */
+        .export-group { display: flex; gap: 8px; margin-top: auto; }
+        .btn-export { flex: 1; padding: 16px; border-radius: 16px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.1s; border: none; text-align: center; }
+        .btn-export:active { transform: scale(0.98); }
+        .btn-primary { background: var(--accent-blue); color: #fff; }
+        .btn-secondary { background: var(--bg-element); color: var(--text-main); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: #E5E5EA; }
 
         /* Рабочая область */
         .viewport { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; background: radial-gradient(circle at center, #ffffff 0%, #E5E5EA 100%); }
@@ -98,23 +102,34 @@
         /* Слои генератора */
         #content-layer { position: relative; z-index: 2; font-family: var(--font-sticker); font-weight: 900; line-height: 1.1; white-space: pre-wrap; text-align: center; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease; }
         #custom-svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-        #custom-svg-layer svg { width: 100%; height: 100%; display: block; }
+        #custom-svg-layer svg { width: 100%; height: 100%; display: block; overflow: visible; }
         #custom-svg-layer path, #custom-svg-layer rect, #custom-svg-layer polygon { fill: var(--custom-svg-fill) !important; transition: fill 0.2s; }
 
         /* Слой готового SVG */
         #pure-svg-layer { display: block; }
-        #pure-svg-layer svg { max-width: 600px; max-height: 600px; display: block; }
+        #pure-svg-layer svg { max-width: 800px; max-height: 800px; display: block; overflow: visible; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         
         <div class="tabs">
-            <button class="tab-btn active" id="tab-gen" onclick="setMode('generator')">Генератор</button>
-            <button class="tab-btn" id="tab-pure" onclick="setMode('pure')">Готовый SVG (Только 3D)</button>
+            <button class="tab-btn active" id="tab-pure" onclick="setMode('pure')">Готовый SVG</button>
+            <button class="tab-btn" id="tab-gen" onclick="setMode('generator')">Генератор</button>
         </div>
 
-        <div id="mode-generator">
+        <div id="mode-pure">
+            <div class="section-title">Готовый макет</div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 0; line-height: 1.4;">Загрузите финальный SVG-файл, в котором уже объединены текст и плашка. Приложение применит к нему только настройки 3D-перспективы.</p>
+            <div class="control-group">
+                <label class="file-upload-btn" style="padding: 30px; border-style: dashed; border-color: var(--accent-blue);">
+                    <span id="pure-svg-label" style="color: var(--accent-blue);">+ Загрузить готовый SVG макет</span>
+                    <input type="file" id="pureSvgInput" accept=".svg">
+                </label>
+            </div>
+        </div>
+
+        <div id="mode-generator" style="display: none;">
             <div class="section-title">Ассеты</div>
             <div class="control-group">
                 <label class="file-upload-btn">
@@ -174,17 +189,6 @@
             <button class="preset-btn" onclick="applyA99()">Восстановить конфигурацию A99</button>
         </div>
 
-        <div id="mode-pure" style="display: none;">
-            <div class="section-title">Готовый макет</div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Загрузите финальный SVG-файл, в котором уже объединены текст и плашка. Приложение применит к нему только настройки 3D-перспективы.</p>
-            <div class="control-group">
-                <label class="file-upload-btn" style="padding: 30px; border-style: dashed; border-color: var(--accent-blue);">
-                    <span id="pure-svg-label" style="color: var(--accent-blue);">+ Загрузить готовый SVG макет</span>
-                    <input type="file" id="pureSvgInput" accept=".svg">
-                </label>
-            </div>
-        </div>
-
         <div style="border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 10px;">
             <div class="section-title">Пространство (3D)</div>
             <div class="control-group">
@@ -207,7 +211,10 @@
             </div>
         </div>
 
-        <button class="btn-export" id="btnPng">Сохранить PNG</button>
+        <div class="export-group">
+            <button class="btn-export btn-secondary" id="btnSvg">В SVG</button>
+            <button class="btn-export btn-primary" id="btnPng">Сохранить PNG</button>
+        </div>
     </div>
 
     <div class="viewport">
@@ -225,7 +232,7 @@
         const wrapper = document.getElementById('transform-wrapper');
         const target = document.getElementById('sticker-target');
         
-        let currentMode = 'generator';
+        let currentMode = 'pure';
         let customBgSVG = null;   // Фон для генератора (Union.svg)
         let pureFullSVG = null;   // Готовый цельный макет
 
@@ -262,7 +269,7 @@
             }; reader.readAsText(file);
         });
 
-        // Готовый цельный макет (Режим 2)
+        // Готовый цельный макет (Режим 1)
         document.getElementById('pureSvgInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; if (!file) return;
             document.getElementById('pure-svg-label').innerText = '✅ ' + file.name;
@@ -287,9 +294,7 @@
                 const kerning = document.getElementById('gKerning').value;
                 const spacing = document.getElementById('gSpacing').value;
 
-                // Трюк с отрицательными отступами:
-                // Если значение > 0: используем padding (отталкиваем границы наружу)
-                // Если значение < 0: используем margin (стягиваем границы внутрь)
+                // Отрицательные отступы
                 const padX = Math.max(0, px); const marX = Math.min(0, px);
                 const padY = Math.max(0, py); const marY = Math.min(0, py);
 
@@ -325,10 +330,8 @@
                 // Режим "Готовый макет"
                 if (pureFullSVG) {
                     target.innerHTML = `<div id="pure-svg-layer">${pureFullSVG}</div>`;
-                    const svgNode = target.querySelector('svg');
-                    if (svgNode) { svgNode.style.width = '100%'; svgNode.style.height = '100%'; }
                 } else {
-                    target.innerHTML = `<div style="padding: 40px; background: #fff; border-radius: 20px; font-weight: bold; font-family: var(--font-ui);">Загрузите SVG справа 👉</div>`;
+                    target.innerHTML = `<div style="padding: 40px; background: #fff; border-radius: 20px; font-weight: bold; font-family: var(--font-ui); color: var(--text-main); box-shadow: 0 10px 20px rgba(0,0,0,0.05);">Загрузите SVG справа 👉</div>`;
                 }
             }
 
@@ -372,12 +375,32 @@
         ['gText', 'gBg', 'gTc', 'gFs', 'gPx', 'gPy', 'gOffX', 'gOffY', 'gKerning', 'gSpacing'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
         ['sPersp', 'sRx', 'sRy', 'sRz'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
 
+        // ЭКСПОРТ PNG
         document.getElementById('btnPng').addEventListener('click', () => {
             domtoimage.toPng(scene, { width: scene.offsetWidth * 2, height: scene.offsetHeight * 2, style: { transform: 'scale(2)', transformOrigin: 'top left' } })
             .then(url => { const a = document.createElement('a'); a.download = `Sber-Render-${Date.now()}.png`; a.href = url; a.click(); });
         });
 
-        renderScene();
+        // ЭКСПОРТ SVG
+        document.getElementById('btnSvg').addEventListener('click', () => {
+            if (currentMode === 'pure' && !pureFullSVG) return alert('Сначала загрузите SVG макет!');
+            
+            const transformString = wrapper.style.transform;
+            const w = target.offsetWidth || 800;
+            const h = target.offsetHeight || 600;
+            const content = currentMode === 'pure' ? pureFullSVG : target.innerHTML; 
+            
+            const finalSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w*1.5}" height="${h*1.5}" viewBox="-${w/4} -${h/4} ${w*1.5} ${h*1.5}"><g style="transform: ${transformString}; transform-origin: center;">${content}</g></svg>`;
+            
+            const blob = new Blob([finalSvg], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `Sber-3D-Vector-${Date.now()}.svg`;
+            link.href = url; link.click(); URL.revokeObjectURL(url);
+        });
+
+        // СТАРТ: Активен 'pure' (Готовый SVG)
+        setMode('pure');
     </script>
 </body>
 </html>
