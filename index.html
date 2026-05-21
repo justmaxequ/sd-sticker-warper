@@ -5,20 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SberDevices Warper | PRO Studio</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400&display=swap" rel="stylesheet">
     <style>
-        /* Корпоративные шрифты */
-        @font-face { font-family: 'SberSans'; src: url('SBSansDisplay-Regular.otf') format('opentype'); font-weight: 400; font-style: normal; }
-        @font-face { font-family: 'SberSans'; src: url('SBSansDisplay-Medium.otf') format('opentype'); font-weight: 600; font-style: normal; }
-        @font-face { font-family: 'SberSans'; src: url('SBSansDisplay-Medium.otf') format('opentype'); font-weight: 700; font-style: normal; }
-        @font-face { font-family: 'SberSans'; src: url('SBSansDisplay-Medium.otf') format('opentype'); font-weight: 900; font-style: normal; }
-
         :root {
-            --bg-element: #F5F5F7; --border-color: #EBEBEB; --accent-blue: #005BFF;
-            --text-main: #080808; --text-muted: #8E8E93;
-            --font-ui: 'SberSans', system-ui, -apple-system, sans-serif;
-            --font-sticker: 'SberSans', Impact, sans-serif; 
-            --grid-color: rgba(0, 0, 0, 0.08);
-            --custom-svg-fill: #54FF45; 
+            --bg-element: #F5F5F7; 
+            --border-color: #EBEBEB; 
+            --accent-blue: #005BFF;
+            --text-main: #080808; 
+            --text-muted: #8E8E93;
+            --font-ui: 'Onest', sans-serif;
+        }
+
+/* Базовая настройка */
+* { box-sizing: border-box; font-family: var(--font-ui); font-weight: 400; }
+
+/* Иерархия Onest */
+.section-title { font-size: 16px; font-weight: 600; } /* SemiBold для заголовков */
+.tab-btn { font-size: 13px; font-weight: 500; }      /* Medium для кнопок */
+.btn-export { font-size: 14px; font-weight: 500; }   /* Medium для экспорта */
+
+/* Принудительно убираем все жирные (700+) стили, если они остались */
+h1, h2, h3, b, strong { font-weight: 600 !important; }
         }
 
         * { box-sizing: border-box; font-family: var(--font-ui); }
