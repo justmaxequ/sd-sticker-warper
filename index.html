@@ -25,7 +25,7 @@
         body { margin: 0; padding: 0; background: var(--bg-element); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
 
         /* Сайдбар */
-        .sidebar { width: 440px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow-y: auto; padding: 24px; gap: 24px; z-index: 10; }
+        .sidebar { width: 440px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow-y: auto; padding: 24px; gap: 24px; z-index: 10; position: relative; }
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-thumb { background: #D1D1D6; border-radius: 3px; }
 
@@ -70,19 +70,22 @@
 
         /* Кнопки экспорта */
         .export-group { display: flex; gap: 8px; margin-top: auto; }
-        .btn-export { background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; flex: 1; transition: 0.1s; display: flex; justify-content: center; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0, 91, 255, 0.2); }
+        .btn-export { background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; flex: 1; transition: 0.1s; display: flex; justify-content: center; align-items: center; gap: 6px; }
         .btn-export:active { transform: scale(0.98); }
-        .btn-export.secondary { background: var(--bg-element); color: var(--text-main); border: 1px solid var(--border-color); box-shadow: none; }
+        .btn-export.secondary { background: var(--bg-element); color: var(--text-main); border: 1px solid var(--border-color); }
         .btn-export.secondary:hover { background: #E5E5EA; }
 
         /* Рабочая сцена */
-        .viewport { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; background: radial-gradient(circle at center, #ffffff 0%, #E5E5EA 100%); }
-        #scene { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        #grid-floor { position: absolute; width: 4000px; height: 4000px; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: 50px 50px; background-position: center; transform: translateY(250px) rotateX(90deg); opacity: 0.6; pointer-events: none; }
+        .viewport { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; background: radial-gradient(circle at center, #ffffff 0%, #E5E5EA 100%); position: relative; }
+        
+        /* КОНТЕЙНЕР ДЛЯ ЭКСПОРТА */
+        #export-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; overflow: visible; }
+        
+        #grid-floor { position: absolute; width: 4000px; height: 4000px; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: 50px 50px; background-position: center; transform: translateY(250px) rotateX(90deg); opacity: 0.6; pointer-events: none; z-index: 0; }
         
         #transform-wrapper { transform-style: preserve-3d; will-change: transform; z-index: 2; position: relative; }
         
-        /* ТЕНЬ УБРАНА ЗДЕСЬ */
+        /* УБРАЛ ТЕНЬ, как ты и просил */
         #sticker-target { position: relative; display: inline-flex; justify-content: center; align-items: center; } 
         
         /* Слои */
@@ -229,8 +232,9 @@
     </div>
 
     <div class="viewport">
-        <div id="scene">
-            <div id="grid-floor"></div>
+        <div id="grid-floor"></div>
+        
+        <div id="export-container">
             <div id="transform-wrapper">
                 <div id="sticker-target">
                     <div id="pure-svg-layer">
@@ -244,7 +248,7 @@
     </div>
 
     <script>
-        const scene = document.getElementById('scene');
+        const exportContainer = document.getElementById('export-container');
         const wrapper = document.getElementById('transform-wrapper');
         const target = document.getElementById('sticker-target');
         const pureLayer = document.getElementById('pure-svg-layer');
@@ -285,7 +289,7 @@
             renderScene();
         }
 
-        // Загрузка SVG (Готовый макет)
+        // Загрузка SVG (Готовый макет) - Умный парсер
         document.getElementById('pureSvgInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; 
             if (!file) return;
@@ -299,6 +303,7 @@
                 const svgEl = doc.querySelector('svg');
                 
                 if (svgEl) {
+                    // Убираем жесткие размеры, чтобы плашка слушалась нашего масштаба
                     svgEl.removeAttribute('width');
                     svgEl.removeAttribute('height');
                     pureFullSVG = svgEl.outerHTML;
@@ -370,13 +375,6 @@
                         ${text}
                     </div>
                 `;
-
-                document.getElementById('v-fs').innerText = fs + 'px';
-                document.getElementById('v-px').innerText = px + 'px';
-                document.getElementById('v-py').innerText = py + 'px';
-                document.getElementById('v-kerning').innerText = kerning + 'px';
-                document.getElementById('v-spacing').innerText = spacing;
-
             } else {
                 if (pureFullSVG) {
                     target.innerHTML = `<div id="pure-svg-layer">${pureFullSVG}</div>`;
@@ -397,7 +395,7 @@
             apply3D();
         }
 
-        // Логика 3D
+        // Логика 3D (Правильная архитектура: perspective на родителе, rotate на потомке)
         function apply3D() {
             const p = document.getElementById('sPersp').value;
             const rx = document.getElementById('sRx').value;
@@ -411,51 +409,57 @@
             document.getElementById('v-rz').innerText = rz + '°';
             document.getElementById('v-scale').innerText = parseFloat(scale).toFixed(1) + 'x';
 
-            wrapper.style.transform = `perspective(${p}px) scale(${scale}) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+            exportContainer.style.perspective = p + 'px';
+            wrapper.style.transform = `scale(${scale}) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
         }
 
         // Слушатели ползунков
         ['gText', 'gFs', 'gPx', 'gPy', 'gOffX', 'gOffY', 'gKerning', 'gSpacing'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
         ['sPersp', 'sRx', 'sRy', 'sRz', 'sScale'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
 
-        // ЭКСПОРТ PNG
+        // ИДЕАЛЬНЫЙ ЭКСПОРТ PNG
         document.getElementById('btnPng').addEventListener('click', () => {
-            if (currentMode === 'pure' && !pureFullSVG) return alert('Сначала загрузите SVG макет!');
+            const scale = 2; // Внутренний зум для высокого разрешения
             
-            document.getElementById('grid-floor').style.display = 'none';
-            scene.style.background = 'transparent';
-
-            domtoimage.toPng(scene)
+            domtoimage.toPng(exportContainer, { 
+                width: exportContainer.clientWidth * scale, 
+                height: exportContainer.clientHeight * scale, 
+                style: { 
+                    transform: `scale(${scale})`, 
+                    transformOrigin: 'top left' 
+                } 
+            })
             .then(url => { 
-                document.getElementById('grid-floor').style.display = 'block';
-                scene.style.background = '';
                 const a = document.createElement('a'); 
                 a.download = `Sber-3D-${Date.now()}.png`; 
                 a.href = url; a.click(); 
             })
-            .catch(err => alert("Ошибка: " + err));
+            .catch(err => alert("Ошибка экспорта PNG: " + err));
         });
 
-        // ЭКСПОРТ SVG (Через dom-to-image для сохранения CSS 3D)
+        // ЭКСПОРТ SVG (С внедрением 3D стилей)
         document.getElementById('btnSvg').addEventListener('click', () => {
-            if (currentMode === 'pure' && !pureFullSVG) return alert('Сначала загрузите SVG макет!');
+            const w = target.offsetWidth || 800;
+            const h = target.offsetHeight || 600;
+            const content = currentMode === 'pure' && pureFullSVG ? pureFullSVG : target.innerHTML; 
             
-            document.getElementById('grid-floor').style.display = 'none';
-            scene.style.background = 'transparent';
-
-            domtoimage.toSvg(scene)
-            .then(url => { 
-                document.getElementById('grid-floor').style.display = 'block';
-                scene.style.background = '';
-                const a = document.createElement('a'); 
-                a.download = `Sber-3D-${Date.now()}.svg`; 
-                a.href = url; a.click(); 
-            })
-            .catch(err => alert("Ошибка: " + err));
+            // Оборачиваем SVG с сохранением 3D-матрицы в <g>
+            const finalSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w*1.5}" height="${h*1.5}" viewBox="-${w/4} -${h/4} ${w*1.5} ${h*1.5}">
+                <g style="transform: ${wrapper.style.transform}; transform-origin: center;">
+                    ${content}
+                </g>
+            </svg>`;
+            
+            const blob = new Blob([finalSvg], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `Sber-3D-Vector-${Date.now()}.svg`;
+            link.href = url; link.click(); URL.revokeObjectURL(url);
         });
 
         // Инициализация
         setMode('pure');
+        apply3D();
     </script>
 </body>
 </html>
