@@ -647,6 +647,103 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         function escapeXmlAttr(s) { return escapeXml(s); }
 
         // === Плоский раст: ровный, без 3D ===
+        // Pure-режим: исходный SVG → Image (Blob URL) → canvas.
+        // Генератор: рисуем НАТИВНО на canvas теми же параметрами что и превью,
+        //            никакого dom-to-image — берём напрямую CSS-значения и пишем
+        //            прямоугольник + текст 1-в-1. Это гарантирует пиксель-в-пиксель.
+        function drawRoundedRectPath(ctx, x, y, w, h, r) {
+            r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx.lineTo(x + r, y + h);
+            ctx.arcTo(x, y + h, x, y + h - r, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+        }
+
+        function getStickerFontFamily() {
+            const cl = target.querySelector('#content-layer');
+            if (cl) {
+                const ff = getComputedStyle(cl).fontFamily;
+                if (ff && ff.trim()) return ff;
+            }
+            const cssVar = getComputedStyle(document.documentElement).getPropertyValue('--font-sticker').trim();
+            return cssVar || "'Onest', sans-serif";
+        }
+
+        function stripFillAttrsInSvgInner(svgInner) {
+            return svgInner.replace(/(<(?:path|rect|polygon|circle|ellipse|polyline|line|g)\b[^>]*?)\sfill\s*=\s*("[^"]*"|'[^']*')/gi, '$1');
+        }
+
+        async function drawCustomBgToCtx(ctx, W, H, bgColor) {
+            const inner = stripFillAttrsInSvgInner(customBgSVG.content);
+            const svgString = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="${SVG_NS}" viewBox="${customBgSVG.viewBox}" width="${W}" height="${H}" preserveAspectRatio="none" fill="${bgColor}">${inner}</svg>`;
+            const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            try {
+                const img = await loadImage(url);
+                ctx.drawImage(img, 0, 0, W, H);
+            } finally {
+                setTimeout(() => URL.revokeObjectURL(url), 1500);
+            }
+        }
+
+        async function drawGeneratorFlat(ctx, W, H) {
+            const text = document.getElementById('gText').value.replace(/\\n/g, '\n');
+            const bg = document.getElementById('gBg').value;
+            const tc = document.getElementById('gTc').value;
+            const fs = parseFloat(document.getElementById('gFs').value);
+            const pad = parseFloat(document.getElementById('gPad').value);
+            const stretch = parseFloat(document.getElementById('gStretch').value) / 100;
+            const padBottom = parseFloat(document.getElementById('gPadBottom').value);
+            const kerning = parseFloat(document.getElementById('gKerning').value);
+            const spacing = parseFloat(document.getElementById('gSpacing').value);
+            const { offX = 0, offY = 0 } = generatorPreset;
+
+            // Фон
+            if (customBgSVG) {
+                await drawCustomBgToCtx(ctx, W, H, bg);
+            } else {
+                const r = Math.min(200, Math.min(W, H) / 2);
+                drawRoundedRectPath(ctx, 0, 0, W, H, r);
+                ctx.fillStyle = bg;
+                ctx.fill();
+            }
+
+            // Текст
+            const fontFamily = getStickerFontFamily();
+            ctx.fillStyle = tc;
+            ctx.font = `900 ${fs}px ${fontFamily}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            try { ctx.letterSpacing = kerning + 'px'; } catch (e) { /* old browsers */ }
+
+            const lines = text.split('\n');
+            const lineHeight = fs * spacing;
+            const totalH = lineHeight * lines.length;
+            const py = Math.round(pad * 0.58);
+            const top = py;
+            const bottom = H - Math.max(0, py + padBottom);
+            const cx = W / 2 + offX;
+            const cy = (top + bottom) / 2 + offY;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            if (Math.abs(stretch - 1) > 1e-3) ctx.scale(stretch, 1);
+            ctx.translate(-cx, -cy);
+
+            lines.forEach((line, i) => {
+                const y = cy - totalH / 2 + lineHeight * (i + 0.5);
+                ctx.fillText(line, cx, y);
+            });
+            ctx.restore();
+        }
+
         async function rasterizeFlatTarget() {
             await waitForReady();
             const rect = target.getBoundingClientRect();
@@ -674,25 +771,11 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
                 return { canvas, cssW: W, cssH: H };
             }
 
-            // Генератор: плоский target → PNG через dom-to-image (без 3D-родителей).
-            // ВАЖНО: НЕ передаём bgcolor — dom-to-image ставит clone.style.backgroundColor,
-            // что затирает inline-фон у target и теряет цветную плашку.
-            const dataUrl = await domtoimage.toPng(target, {
-                width: W * scale,
-                height: H * scale,
-                cacheBust: true,
-                style: {
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                    width: W + 'px',
-                    height: H + 'px',
-                    margin: '0'
-                }
-            });
-            const img = await loadImage(dataUrl);
-            // dom-to-image сам даёт правильный размер, но дорисуем чтобы гарантировать целевой canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // Генератор: рисуем нативно
+            ctx.save();
+            ctx.scale(scale, scale);
+            await drawGeneratorFlat(ctx, W, H);
+            ctx.restore();
             return { canvas, cssW: W, cssH: H };
         }
 
@@ -856,11 +939,6 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         }
 
         // === SVG: настоящий вектор ===
-        function stripFillAttrs(svgInner) {
-            // Снимаем фиксированный fill с шейпов чтобы наследовался cascade fill
-            return svgInner.replace(/(<(?:path|rect|polygon|circle|ellipse|polyline|line)\b[^>]*?)\sfill\s*=\s*("[^"]*"|'[^']*')/gi, '$1');
-        }
-
         function buildGeneratorVectorSvg() {
             const text = document.getElementById('gText').value.replace(/\\n/g, '\n');
             const bg = document.getElementById('gBg').value;
@@ -887,7 +965,7 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             // Фон: либо кастомный SVG, либо скруглённый прямоугольник
             let bgEl;
             if (customBgSVG) {
-                const inner = stripFillAttrs(customBgSVG.content);
+                const inner = stripFillAttrsInSvgInner(customBgSVG.content);
                 bgEl = `<svg x="0" y="0" width="${W}" height="${H}" viewBox="${escapeXmlAttr(customBgSVG.viewBox)}" preserveAspectRatio="none" fill="${escapeXmlAttr(bg)}">${inner}</svg>`;
             } else {
                 const radius = Math.min(200, Math.min(W, H) / 2);
