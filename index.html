@@ -251,6 +251,8 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         };
         let generatorPreset = { ...GENERATOR_PRESETS.balanced };
         const EXPORT_PADDING = 64;
+        const EXPORT_SCALE = 2;
+        const EXPORT_MESH_STEPS = 32;
 
         // Синхронизация Color Pickers
         function syncColorPicker(inputId, hexId) {
@@ -333,7 +335,9 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             return {
                 markup: svgEl.outerHTML,
                 content: svgEl.innerHTML,
-                viewBox: svgEl.getAttribute('viewBox') || '0 0 100 100'
+                viewBox: svgEl.getAttribute('viewBox') || '0 0 100 100',
+                width: width || 100,
+                height: height || 100
             };
         }
 
@@ -484,53 +488,6 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         ['gText', 'gFs', 'gPad'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
         ['sPersp', 'sRx', 'sRy', 'sScale'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
 
-        function copyRootCssVariables(node) {
-            const computed = getComputedStyle(document.documentElement);
-            ['--bg-element', '--border-color', '--accent-blue', '--text-main', '--text-muted', '--font-ui', '--font-sticker', '--custom-svg-fill'].forEach(prop => {
-                const value = computed.getPropertyValue(prop);
-                if (value) node.style.setProperty(prop, value);
-            });
-        }
-
-        function createExportSnapshot() {
-            apply3D();
-            const rect = wrapper.getBoundingClientRect();
-            const fallbackWidth = target.offsetWidth || 800;
-            const fallbackHeight = target.offsetHeight || 600;
-            const width = Math.ceil(Math.max(rect.width, fallbackWidth) + EXPORT_PADDING * 2);
-            const height = Math.ceil(Math.max(rect.height, fallbackHeight) + EXPORT_PADDING * 2);
-
-            const host = document.createElement('div');
-            host.style.position = 'fixed';
-            host.style.left = '-100000px';
-            host.style.top = '0';
-            host.style.pointerEvents = 'none';
-            host.style.zIndex = '-1';
-
-            const stage = document.createElement('div');
-            stage.className = 'export-stage';
-            stage.style.width = width + 'px';
-            stage.style.height = height + 'px';
-            stage.style.display = 'flex';
-            stage.style.alignItems = 'center';
-            stage.style.justifyContent = 'center';
-            stage.style.overflow = 'visible';
-            stage.style.background = 'transparent';
-            stage.style.perspective = exportContainer.style.perspective;
-            stage.style.transformStyle = 'preserve-3d';
-            copyRootCssVariables(stage);
-
-            const clonedWrapper = wrapper.cloneNode(true);
-            clonedWrapper.style.transform = wrapper.style.transform;
-            clonedWrapper.style.transformOrigin = 'center center';
-            clonedWrapper.style.transformStyle = 'preserve-3d';
-            stage.appendChild(clonedWrapper);
-
-            host.appendChild(stage);
-            document.body.appendChild(host);
-            return { host, stage, width, height, cleanup: () => host.remove() };
-        }
-
         function downloadBlob(filename, content, type) {
             const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
@@ -541,67 +498,265 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             URL.revokeObjectURL(url);
         }
 
-        function collectExportStyles() {
-            return [...document.querySelectorAll('style')]
-                .map(style => style.textContent)
-                .join('\n');
+        function downloadUrl(filename, url) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = url;
+            link.click();
         }
 
-        function serializeSnapshotToSvg(stage, width, height) {
-            const clone = stage.cloneNode(true);
-            clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-            clone.style.position = 'relative';
-
-            const style = document.createElement('style');
-            style.textContent = collectExportStyles();
-            clone.insertBefore(style, clone.firstChild);
-
-            const xhtml = new XMLSerializer().serializeToString(clone);
-            return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    <foreignObject x="0" y="0" width="${width}" height="${height}">
-        ${xhtml}
-    </foreignObject>
-</svg>`;
+        function setExportBusy(isBusy) {
+            document.getElementById('btnPng').disabled = isBusy;
+            document.getElementById('btnSvg').disabled = isBusy;
         }
 
-        // Экспорт PNG: сохраняем только объект с нужным отступом, без сетки и лишней сцены.
-        document.getElementById('btnPng').addEventListener('click', () => {
-            const snapshot = createExportSnapshot();
-            const scale = 2;
+        function escapeXmlAttr(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
 
-            domtoimage.toPng(snapshot.stage, {
-                width: snapshot.width * scale,
-                height: snapshot.height * scale,
-                bgcolor: 'transparent',
-                cacheBust: true,
-                style: {
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                    width: snapshot.width + 'px',
-                    height: snapshot.height + 'px'
+        function getTargetSize() {
+            const width = Math.ceil(target.offsetWidth || target.scrollWidth || 800);
+            const height = Math.ceil(target.offsetHeight || target.scrollHeight || 600);
+            if (!width || !height) {
+                throw new Error('Нечего экспортировать: макет не получил размер.');
+            }
+            return { width, height };
+        }
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Не удалось подготовить изображение для экспорта.'));
+                img.src = src;
+            });
+        }
+
+        function svgToDataUrl(markup) {
+            const encoded = btoa(unescape(encodeURIComponent(markup)));
+            return 'data:image/svg+xml;base64,' + encoded;
+        }
+
+        async function createFlatSource() {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready.catch(() => null);
+            }
+
+            const size = getTargetSize();
+            let dataUrl;
+
+            if (currentMode === 'pure' && pureFullSVG) {
+                dataUrl = svgToDataUrl(pureFullSVG);
+            } else {
+                dataUrl = await domtoimage.toPng(target, {
+                    width: size.width * EXPORT_SCALE,
+                    height: size.height * EXPORT_SCALE,
+                    bgcolor: 'transparent',
+                    cacheBust: true,
+                    style: {
+                        transform: `scale(${EXPORT_SCALE})`,
+                        transformOrigin: 'top left',
+                        width: size.width + 'px',
+                        height: size.height + 'px'
+                    }
+                });
+            }
+
+            const image = await loadImage(dataUrl);
+            return { ...size, dataUrl, image };
+        }
+
+        function getExportTransformSettings() {
+            return {
+                perspective: Number(document.getElementById('sPersp').value) || 800,
+                rx: (Number(document.getElementById('sRx').value) || 0) * Math.PI / 180,
+                ry: (Number(document.getElementById('sRy').value) || 0) * Math.PI / 180,
+                scale: Number(document.getElementById('sScale').value) || 1
+            };
+        }
+
+        function projectPoint(u, v, width, height, settings) {
+            let x = (u - width / 2) * settings.scale;
+            let y = (v - height / 2) * settings.scale;
+            let z = 0;
+
+            const cosY = Math.cos(settings.ry);
+            const sinY = Math.sin(settings.ry);
+            let nx = x * cosY + z * sinY;
+            let nz = -x * sinY + z * cosY;
+            x = nx;
+            z = nz;
+
+            const cosX = Math.cos(settings.rx);
+            const sinX = Math.sin(settings.rx);
+            const ny = y * cosX - z * sinX;
+            nz = y * sinX + z * cosX;
+            y = ny;
+            z = nz;
+
+            const perspective = Math.max(50, settings.perspective);
+            const factor = perspective / Math.max(1, perspective - z);
+            return { x: x * factor, y: y * factor };
+        }
+
+        function getProjectedBounds(width, height, settings) {
+            const corners = [
+                projectPoint(0, 0, width, height, settings),
+                projectPoint(width, 0, width, height, settings),
+                projectPoint(width, height, width, height, settings),
+                projectPoint(0, height, width, height, settings)
+            ];
+            const xs = corners.map(point => point.x);
+            const ys = corners.map(point => point.y);
+            return {
+                minX: Math.min(...xs),
+                maxX: Math.max(...xs),
+                minY: Math.min(...ys),
+                maxY: Math.max(...ys)
+            };
+        }
+
+        function affineFromTriangles(src, dst) {
+            const [s0, s1, s2] = src;
+            const [d0, d1, d2] = dst;
+            const den = s0.x * (s1.y - s2.y) + s1.x * (s2.y - s0.y) + s2.x * (s0.y - s1.y);
+            if (Math.abs(den) < 0.000001) return null;
+
+            return {
+                a: (d0.x * (s1.y - s2.y) + d1.x * (s2.y - s0.y) + d2.x * (s0.y - s1.y)) / den,
+                b: (d0.y * (s1.y - s2.y) + d1.y * (s2.y - s0.y) + d2.y * (s0.y - s1.y)) / den,
+                c: (d0.x * (s2.x - s1.x) + d1.x * (s0.x - s2.x) + d2.x * (s1.x - s0.x)) / den,
+                d: (d0.y * (s2.x - s1.x) + d1.y * (s0.x - s2.x) + d2.y * (s1.x - s0.x)) / den,
+                e: (d0.x * (s1.x * s2.y - s2.x * s1.y) + d1.x * (s2.x * s0.y - s0.x * s2.y) + d2.x * (s0.x * s1.y - s1.x * s0.y)) / den,
+                f: (d0.y * (s1.x * s2.y - s2.x * s1.y) + d1.y * (s2.x * s0.y - s0.x * s2.y) + d2.y * (s0.x * s1.y - s1.x * s0.y)) / den
+            };
+        }
+
+        function buildPerspectiveMesh(source, outputScale = 1) {
+            const settings = getExportTransformSettings();
+            const bounds = getProjectedBounds(source.width, source.height, settings);
+            const outWidth = Math.ceil(bounds.maxX - bounds.minX + EXPORT_PADDING * 2);
+            const outHeight = Math.ceil(bounds.maxY - bounds.minY + EXPORT_PADDING * 2);
+            const sourceScaleX = source.image.width / source.width;
+            const sourceScaleY = source.image.height / source.height;
+            const triangles = [];
+
+            const toDest = (u, v) => {
+                const point = projectPoint(u, v, source.width, source.height, settings);
+                return {
+                    x: (point.x - bounds.minX + EXPORT_PADDING) * outputScale,
+                    y: (point.y - bounds.minY + EXPORT_PADDING) * outputScale
+                };
+            };
+
+            const toSrc = (u, v) => ({ x: u * sourceScaleX, y: v * sourceScaleY });
+            const steps = EXPORT_MESH_STEPS;
+
+            for (let row = 0; row < steps; row++) {
+                const v0 = source.height * row / steps;
+                const v1 = source.height * (row + 1) / steps;
+                for (let col = 0; col < steps; col++) {
+                    const u0 = source.width * col / steps;
+                    const u1 = source.width * (col + 1) / steps;
+
+                    const p00 = toDest(u0, v0);
+                    const p10 = toDest(u1, v0);
+                    const p11 = toDest(u1, v1);
+                    const p01 = toDest(u0, v1);
+                    const s00 = toSrc(u0, v0);
+                    const s10 = toSrc(u1, v0);
+                    const s11 = toSrc(u1, v1);
+                    const s01 = toSrc(u0, v1);
+
+                    triangles.push({ src: [s00, s10, s11], dst: [p00, p10, p11] });
+                    triangles.push({ src: [s00, s11, s01], dst: [p00, p11, p01] });
                 }
-            })
-            .then(url => {
-                const a = document.createElement('a');
-                a.download = `Sber-3D-${Date.now()}.png`;
-                a.href = url;
-                a.click();
-            })
-            .catch(err => alert("Ошибка экспорта PNG: " + err))
-            .finally(snapshot.cleanup);
+            }
+
+            return { width: outWidth, height: outHeight, triangles };
+        }
+
+        function drawTriangle(ctx, image, triangle) {
+            const matrix = affineFromTriangles(triangle.src, triangle.dst);
+            if (!matrix) return;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(triangle.dst[0].x, triangle.dst[0].y);
+            ctx.lineTo(triangle.dst[1].x, triangle.dst[1].y);
+            ctx.lineTo(triangle.dst[2].x, triangle.dst[2].y);
+            ctx.closePath();
+            ctx.clip();
+            ctx.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+            ctx.drawImage(image, 0, 0);
+            ctx.restore();
+        }
+
+        async function exportPerspectivePng() {
+            const source = await createFlatSource();
+            const mesh = buildPerspectiveMesh(source, EXPORT_SCALE);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.ceil(mesh.width * EXPORT_SCALE);
+            canvas.height = Math.ceil(mesh.height * EXPORT_SCALE);
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            mesh.triangles.forEach(triangle => drawTriangle(ctx, source.image, triangle));
+            downloadUrl(`Sber-3D-${Date.now()}.png`, canvas.toDataURL('image/png'));
+        }
+
+        function triangleSvgParts(triangle, index) {
+            const matrix = affineFromTriangles(triangle.src, triangle.dst);
+            if (!matrix) return null;
+            const points = triangle.dst.map(point => `${point.x.toFixed(3)},${point.y.toFixed(3)}`).join(' ');
+            const m = [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].map(value => Number(value).toFixed(8)).join(' ');
+            return {
+                clip: `        <clipPath id="clip-${index}" clipPathUnits="userSpaceOnUse"><polygon points="${points}" /></clipPath>`,
+                use: `    <use href="#source-image" clip-path="url(#clip-${index})" transform="matrix(${m})" />`
+            };
+        }
+
+        async function exportPerspectiveSvg() {
+            const source = await createFlatSource();
+            const mesh = buildPerspectiveMesh(source, 1);
+            const parts = mesh.triangles.map((triangle, index) => triangleSvgParts(triangle, index)).filter(Boolean);
+            const clips = parts.map(part => part.clip).join('\n');
+            const uses = parts.map(part => part.use).join('\n');
+            const href = escapeXmlAttr(source.dataUrl);
+            const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${mesh.width}" height="${mesh.height}" viewBox="0 0 ${mesh.width} ${mesh.height}">
+    <defs>
+        <image id="source-image" href="${href}" xlink:href="${href}" width="${source.image.width}" height="${source.image.height}" preserveAspectRatio="none" />
+${clips}
+    </defs>
+${uses}
+</svg>`;
+            downloadBlob(`Sber-3D-Vector-${Date.now()}.svg`, svg, 'image/svg+xml;charset=utf-8');
+        }
+
+        document.getElementById('btnPng').addEventListener('click', async () => {
+            setExportBusy(true);
+            try {
+                await exportPerspectivePng();
+            } catch (err) {
+                alert('Ошибка экспорта PNG: ' + err.message);
+            } finally {
+                setExportBusy(false);
+            }
         });
 
-        // Экспорт SVG: standalone-файл с тем же визуальным кадром, что и PNG.
-        document.getElementById('btnSvg').addEventListener('click', () => {
-            const snapshot = createExportSnapshot();
+        document.getElementById('btnSvg').addEventListener('click', async () => {
+            setExportBusy(true);
             try {
-                const finalSvg = serializeSnapshotToSvg(snapshot.stage, snapshot.width, snapshot.height);
-                downloadBlob(`Sber-3D-Vector-${Date.now()}.svg`, finalSvg, 'image/svg+xml;charset=utf-8');
+                await exportPerspectiveSvg();
             } catch (err) {
-                alert("Ошибка экспорта SVG: " + err);
+                alert('Ошибка экспорта SVG: ' + err.message);
             } finally {
-                snapshot.cleanup();
+                setExportBusy(false);
             }
         });
 
