@@ -307,6 +307,7 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         let currentMode = 'pure';
         let customBgSVG = null;
         let pureFullSVG = null;
+        let customFontDataUrl = null;
         const GENERATOR_PRESETS = {
             compact: { fs: 56, pad: 44, padBottom: 0, kerning: -1, spacing: 1.05, stretch: 96, offX: 0, offY: -6 },
             balanced: { fs: 65, pad: 70, padBottom: 0, kerning: -2, spacing: 1.1, stretch: 100, offX: 0, offY: -12 },
@@ -439,10 +440,13 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         document.getElementById('fontInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; if (!file) return;
             document.getElementById('font-name-label').innerText = '✅ Шрифт загружен';
-            const reader = new FileReader(); reader.onload = function(e) {
+            const reader = new FileReader(); reader.onload = function(ev) {
+                customFontDataUrl = ev.target.result;
                 const newStyle = document.createElement('style');
-                newStyle.appendChild(document.createTextNode(`@font-face { font-family: 'CustomFont'; src: url('${e.target.result}'); }`));
-                document.head.appendChild(newStyle); document.documentElement.style.setProperty('--font-sticker', "'CustomFont', sans-serif"); renderScene();
+                newStyle.appendChild(document.createTextNode(`@font-face { font-family: 'CustomFont'; src: url('${customFontDataUrl}'); }`));
+                document.head.appendChild(newStyle);
+                document.documentElement.style.setProperty('--font-sticker', "'CustomFont', sans-serif");
+                renderScene();
             }; reader.readAsDataURL(file);
         });
 
@@ -590,9 +594,16 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         });
 
         // ============ ЭКСПОРТ ============
-        // PNG: захватываем живую 3D-сцену из вьюпорта через dom-to-image и обрезаем по стикеру.
-        // SVG: отдаём чистый вектор — в режиме "Готовый макет" сохраняем исходный SVG,
-        //      в режиме "Генератор" пакуем плоский макет через domtoimage.toSvg.
+        // Стратегия:
+        //  1) PNG: рендерим ПЛОСКИЙ стикер в высокое разрешение (SVG → canvas для pure-режима,
+        //     dom-to-image на flat target для генератора). Потом сами применяем 3D-перспективу через
+        //     сеточный triangle-mesh varp на 2D-canvas. Так мы не зависим от поддержки 3D в foreignObject.
+        //  2) SVG: настоящий вектор. В pure-режиме — исходный SVG как есть. В генераторе — строим
+        //     SVG из <rect>/<text> (а не foreignObject), при необходимости встраиваем загруженный шрифт.
+
+        const WARP_GRID = 32; // подразбиение сетки для перспективного варпа
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+
         function downloadBlob(filename, content, type) {
             const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
@@ -630,89 +641,294 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
         }
 
-        function decodeSvgDataUrl(dataUrl) {
-            // dom-to-image's toSvg returns "data:image/svg+xml;charset=utf-8,<markup>" where
-            // <markup> is NOT URL-encoded. So we mostly just strip the prefix; decodeURIComponent
-            // is only safe when the body actually contains percent-encoded escapes.
-            const utf8Prefix = 'data:image/svg+xml;charset=utf-8,';
-            const utf8PrefixAlt = 'data:image/svg+xml;utf8,';
-            const base64Prefix = 'data:image/svg+xml;base64,';
-            const safeDecode = (body) => {
-                if (!/%[0-9A-Fa-f]{2}/.test(body)) return body;
-                try { return decodeURIComponent(body); } catch (e) { return body; }
-            };
-            if (dataUrl.startsWith(utf8Prefix)) return safeDecode(dataUrl.slice(utf8Prefix.length));
-            if (dataUrl.startsWith(utf8PrefixAlt)) return safeDecode(dataUrl.slice(utf8PrefixAlt.length));
-            if (dataUrl.startsWith(base64Prefix)) {
-                const b64 = dataUrl.slice(base64Prefix.length);
-                try { return decodeURIComponent(escape(atob(b64))); } catch (e) { return atob(b64); }
+        function escapeXml(s) {
+            return String(s).replace(/[<>&'"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'})[c]);
+        }
+        function escapeXmlAttr(s) { return escapeXml(s); }
+
+        // === Плоский раст: ровный, без 3D ===
+        async function rasterizeFlatTarget() {
+            await waitForReady();
+            const rect = target.getBoundingClientRect();
+            const W = Math.max(1, Math.ceil(rect.width));
+            const H = Math.max(1, Math.ceil(rect.height));
+            const scale = EXPORT_SCALE;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = W * scale;
+            canvas.height = H * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            if (currentMode === 'pure') {
+                if (!pureFullSVG) throw new Error('Сначала загрузите SVG-макет.');
+                const blob = new Blob([pureFullSVG], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                try {
+                    const img = await loadImage(url);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                } finally {
+                    setTimeout(() => URL.revokeObjectURL(url), 1500);
+                }
+                return { canvas, cssW: W, cssH: H };
             }
-            const comma = dataUrl.indexOf(',');
-            return comma >= 0 ? safeDecode(dataUrl.slice(comma + 1)) : dataUrl;
+
+            // Генератор: плоский target → PNG через dom-to-image (без 3D-родителей).
+            // ВАЖНО: НЕ передаём bgcolor — dom-to-image ставит clone.style.backgroundColor,
+            // что затирает inline-фон у target и теряет цветную плашку.
+            const dataUrl = await domtoimage.toPng(target, {
+                width: W * scale,
+                height: H * scale,
+                cacheBust: true,
+                style: {
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    width: W + 'px',
+                    height: H + 'px',
+                    margin: '0'
+                }
+            });
+            const img = await loadImage(dataUrl);
+            // dom-to-image сам даёт правильный размер, но дорисуем чтобы гарантировать целевой canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            return { canvas, cssW: W, cssH: H };
+        }
+
+        // === Проекция точки через rotateY → rotateX → scale → perspective divide ===
+        function getTransformSettings() {
+            return {
+                perspective: Number(document.getElementById('sPersp').value) || 800,
+                rx: (Number(document.getElementById('sRx').value) || 0) * Math.PI / 180,
+                ry: (Number(document.getElementById('sRy').value) || 0) * Math.PI / 180,
+                scale: Number(document.getElementById('sScale').value) || 1
+            };
+        }
+
+        function projectPoint(u, v, W, H, s) {
+            let x = (u - W / 2) * s.scale;
+            let y = (v - H / 2) * s.scale;
+            let z = 0;
+
+            // rotateY
+            const cosY = Math.cos(s.ry), sinY = Math.sin(s.ry);
+            let nx = x * cosY + z * sinY;
+            let nz = -x * sinY + z * cosY;
+            x = nx; z = nz;
+
+            // rotateX
+            const cosX = Math.cos(s.rx), sinX = Math.sin(s.rx);
+            const ny = y * cosX - z * sinX;
+            nz = y * sinX + z * cosX;
+            y = ny; z = nz;
+
+            // perspective divide (как в CSS)
+            const p = Math.max(50, s.perspective);
+            const factor = p / Math.max(1, p - z);
+            return { x: x * factor, y: y * factor };
+        }
+
+        // Сам варп — рисуем 2*N*N маленьких треугольников с аффинным отображением,
+        // что суммарно приближает истинную перспективную проекцию.
+        function warpToPerspective(flat) {
+            const { canvas: src, cssW, cssH } = flat;
+            const settings = getTransformSettings();
+            const grid = WARP_GRID;
+
+            // Спроецируем узлы сетки в CSS-пиксельном пространстве
+            const verts = [];
+            for (let j = 0; j <= grid; j++) {
+                const row = [];
+                for (let i = 0; i <= grid; i++) {
+                    const u = (i / grid) * cssW;
+                    const v = (j / grid) * cssH;
+                    row.push(projectPoint(u, v, cssW, cssH, settings));
+                }
+                verts.push(row);
+            }
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const row of verts) for (const p of row) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+
+            const padCss = EXPORT_PADDING;
+            const outCssW = Math.ceil(maxX - minX) + padCss * 2;
+            const outCssH = Math.ceil(maxY - minY) + padCss * 2;
+            const offCssX = -minX + padCss;
+            const offCssY = -minY + padCss;
+
+            const outScale = EXPORT_SCALE;
+            const out = document.createElement('canvas');
+            out.width = Math.max(1, outCssW * outScale);
+            out.height = Math.max(1, outCssH * outScale);
+            const ctx = out.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            // Source pixel sизе соответствует cssW*outScale × cssH*outScale (rasterizeFlatTarget)
+            const sxScale = src.width / cssW;
+            const syScale = src.height / cssH;
+
+            for (let j = 0; j < grid; j++) {
+                for (let i = 0; i < grid; i++) {
+                    const u0c = (i / grid) * cssW;
+                    const v0c = (j / grid) * cssH;
+                    const u1c = ((i + 1) / grid) * cssW;
+                    const v1c = ((j + 1) / grid) * cssH;
+
+                    const su0 = u0c * sxScale, sv0 = v0c * syScale;
+                    const su1 = u1c * sxScale, sv1 = v1c * syScale;
+
+                    const tl = verts[j][i],     tr = verts[j][i + 1];
+                    const bl = verts[j + 1][i], br = verts[j + 1][i + 1];
+
+                    const dtlX = (tl.x + offCssX) * outScale, dtlY = (tl.y + offCssY) * outScale;
+                    const dtrX = (tr.x + offCssX) * outScale, dtrY = (tr.y + offCssY) * outScale;
+                    const dblX = (bl.x + offCssX) * outScale, dblY = (bl.y + offCssY) * outScale;
+                    const dbrX = (br.x + offCssX) * outScale, dbrY = (br.y + offCssY) * outScale;
+
+                    drawWarpedTriangle(ctx, src,
+                        su0, sv0, su1, sv0, su0, sv1,
+                        dtlX, dtlY, dtrX, dtrY, dblX, dblY
+                    );
+                    drawWarpedTriangle(ctx, src,
+                        su1, sv0, su1, sv1, su0, sv1,
+                        dtrX, dtrY, dbrX, dbrY, dblX, dblY
+                    );
+                }
+            }
+
+            return out;
+        }
+
+        // Аффинное отображение исходного треугольника на целевой через clip+transform+drawImage.
+        // Клип-треугольник расширяем наружу от центроида на FATTEN пикселей чтобы соседние ячейки
+        // перекрывались и швы между ними не светились на финальном PNG.
+        const TRIANGLE_FATTEN = 1.5;
+        function drawWarpedTriangle(ctx, src,
+            sx0, sy0, sx1, sy1, sx2, sy2,
+            dx0, dy0, dx1, dy1, dx2, dy2) {
+            const denom = (sx1 - sx0) * (sy2 - sy0) - (sx2 - sx0) * (sy1 - sy0);
+            if (Math.abs(denom) < 1e-9) return;
+            const a = ((dx1 - dx0) * (sy2 - sy0) - (dx2 - dx0) * (sy1 - sy0)) / denom;
+            const c = ((dx2 - dx0) * (sx1 - sx0) - (dx1 - dx0) * (sx2 - sx0)) / denom;
+            const e = dx0 - a * sx0 - c * sy0;
+            const b = ((dy1 - dy0) * (sy2 - sy0) - (dy2 - dy0) * (sy1 - sy0)) / denom;
+            const d = ((dy2 - dy0) * (sx1 - sx0) - (dy1 - dy0) * (sx2 - sx0)) / denom;
+            const f = dy0 - b * sx0 - d * sy0;
+
+            // Расширяем каждый угол от центроида на заданное число пикселей наружу.
+            const cx = (dx0 + dx1 + dx2) / 3;
+            const cy = (dy0 + dy1 + dy2) / 3;
+            const expand = (x, y) => {
+                const vx = x - cx, vy = y - cy;
+                const len = Math.hypot(vx, vy) || 1;
+                return [x + vx / len * TRIANGLE_FATTEN, y + vy / len * TRIANGLE_FATTEN];
+            };
+            const [fx0, fy0] = expand(dx0, dy0);
+            const [fx1, fy1] = expand(dx1, dy1);
+            const [fx2, fy2] = expand(dx2, dy2);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(fx0, fy0);
+            ctx.lineTo(fx1, fy1);
+            ctx.lineTo(fx2, fy2);
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.setTransform(a, b, c, d, e, f);
+            ctx.drawImage(src, 0, 0);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.restore();
         }
 
         // === PNG ===
         async function exportScenePng() {
-            await waitForReady();
-
-            const viewport = document.querySelector('.viewport');
-            if (!viewport) throw new Error('Не найдена рабочая сцена.');
-
-            const viewportRect = viewport.getBoundingClientRect();
-            const wrapperRect = wrapper.getBoundingClientRect();
-
-            if (!wrapperRect.width || !wrapperRect.height) {
-                throw new Error('Макет пуст — нечего экспортировать.');
-            }
-
-            const pad = EXPORT_PADDING;
-            const scale = EXPORT_SCALE;
-
-            // Область обрезки в координатах вьюпорта
-            const cropLeft = Math.max(0, Math.floor(wrapperRect.left - viewportRect.left - pad));
-            const cropTop = Math.max(0, Math.floor(wrapperRect.top - viewportRect.top - pad));
-            const cropRight = Math.min(viewportRect.width, Math.ceil(wrapperRect.right - viewportRect.left + pad));
-            const cropBottom = Math.min(viewportRect.height, Math.ceil(wrapperRect.bottom - viewportRect.top + pad));
-            const cropW = Math.max(1, cropRight - cropLeft);
-            const cropH = Math.max(1, cropBottom - cropTop);
-
-            const dataUrl = await domtoimage.toPng(viewport, {
-                bgcolor: 'transparent',
-                cacheBust: true,
-                width: Math.ceil(viewportRect.width * scale),
-                height: Math.ceil(viewportRect.height * scale),
-                filter: (node) => {
-                    // Сетка-пол только для превью, в экспорт не идёт
-                    return !(node && node.id === 'grid-floor');
-                },
-                style: {
-                    background: 'transparent',
-                    backgroundImage: 'none',
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                    width: viewportRect.width + 'px',
-                    height: viewportRect.height + 'px'
-                }
-            });
-
-            const img = await loadImage(dataUrl);
-
-            const out = document.createElement('canvas');
-            out.width = Math.max(1, Math.round(cropW * scale));
-            out.height = Math.max(1, Math.round(cropH * scale));
-            const ctx = out.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(
-                img,
-                cropLeft * scale, cropTop * scale, cropW * scale, cropH * scale,
-                0, 0, out.width, out.height
-            );
-
-            triggerDownload(`Sber-Warper-${Date.now()}.png`, out.toDataURL('image/png'));
+            const flat = await rasterizeFlatTarget();
+            const warped = warpToPerspective(flat);
+            triggerDownload(`Sber-Warper-${Date.now()}.png`, warped.toDataURL('image/png'));
         }
 
-        // === SVG ===
+        // === SVG: настоящий вектор ===
+        function stripFillAttrs(svgInner) {
+            // Снимаем фиксированный fill с шейпов чтобы наследовался cascade fill
+            return svgInner.replace(/(<(?:path|rect|polygon|circle|ellipse|polyline|line)\b[^>]*?)\sfill\s*=\s*("[^"]*"|'[^']*')/gi, '$1');
+        }
+
+        function buildGeneratorVectorSvg() {
+            const text = document.getElementById('gText').value.replace(/\\n/g, '\n');
+            const bg = document.getElementById('gBg').value;
+            const tc = document.getElementById('gTc').value;
+            const fs = parseFloat(document.getElementById('gFs').value);
+            const pad = parseFloat(document.getElementById('gPad').value);
+            const stretch = parseFloat(document.getElementById('gStretch').value) / 100;
+            const padBottom = parseFloat(document.getElementById('gPadBottom').value);
+            const kerning = parseFloat(document.getElementById('gKerning').value);
+            const spacing = parseFloat(document.getElementById('gSpacing').value);
+            const { offX = 0, offY = 0 } = generatorPreset;
+
+            const rect = target.getBoundingClientRect();
+            const W = Math.max(1, Math.ceil(rect.width));
+            const H = Math.max(1, Math.ceil(rect.height));
+
+            // Берём live font-family у content-layer (или подставляем sans-serif)
+            const contentLayer = target.querySelector('#content-layer');
+            const liveFontFamily = contentLayer
+                ? getComputedStyle(contentLayer).fontFamily
+                : (getComputedStyle(document.documentElement).getPropertyValue('--font-sticker') || 'sans-serif');
+            const fontFamily = (liveFontFamily || 'sans-serif').trim() || 'sans-serif';
+
+            // Фон: либо кастомный SVG, либо скруглённый прямоугольник
+            let bgEl;
+            if (customBgSVG) {
+                const inner = stripFillAttrs(customBgSVG.content);
+                bgEl = `<svg x="0" y="0" width="${W}" height="${H}" viewBox="${escapeXmlAttr(customBgSVG.viewBox)}" preserveAspectRatio="none" fill="${escapeXmlAttr(bg)}">${inner}</svg>`;
+            } else {
+                const radius = Math.min(200, Math.min(W, H) / 2);
+                bgEl = `<rect x="0" y="0" width="${W}" height="${H}" rx="${radius}" ry="${radius}" fill="${escapeXmlAttr(bg)}"/>`;
+            }
+
+            // Текст
+            const lines = text.split('\n');
+            const lineHeight = fs * spacing;
+            const totalH = lineHeight * lines.length;
+            const py = Math.round(pad * 0.58);
+            const top = py;
+            const bottom = H - Math.max(0, py + padBottom);
+            const cx = W / 2 + offX;
+            const cy = (top + bottom) / 2 + offY;
+            const startY = cy - totalH / 2 + lineHeight / 2;
+
+            const textLines = lines.map((line, i) => {
+                const yPos = startY + i * lineHeight;
+                return `<text x="${cx}" y="${yPos}" font-family="${escapeXmlAttr(fontFamily)}" font-size="${fs}" font-weight="900" letter-spacing="${kerning}" fill="${escapeXmlAttr(tc)}" text-anchor="middle" dominant-baseline="central">${escapeXml(line)}</text>`;
+            }).join('\n  ');
+
+            const textGroup = Math.abs(stretch - 1) < 1e-3
+                ? textLines
+                : `<g transform="translate(${cx} ${cy}) scale(${stretch} 1) translate(${-cx} ${-cy})">\n  ${textLines}\n  </g>`;
+
+            // Встраиваем кастомный шрифт чтобы SVG был самодостаточным
+            let fontEmbed = '';
+            if (customFontDataUrl && /CustomFont/i.test(fontFamily)) {
+                const css = `@font-face { font-family: 'CustomFont'; src: url('${customFontDataUrl}'); font-weight: 100 900; font-style: normal; }`;
+                fontEmbed = `<defs><style type="text/css"><![CDATA[\n${css}\n]]></style></defs>`;
+            }
+
+            return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="${SVG_NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  ${fontEmbed}
+  ${bgEl}
+  ${textGroup}
+</svg>`;
+        }
+
         async function exportSceneSvg() {
             if (currentMode === 'pure') {
                 if (!pureFullSVG) {
@@ -725,21 +941,9 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
                 return;
             }
 
-            // Генератор: отдаём плоский макет как self-contained SVG (foreignObject)
             await waitForReady();
-            const rect = target.getBoundingClientRect();
-            const W = Math.max(1, Math.ceil(rect.width));
-            const H = Math.max(1, Math.ceil(rect.height));
-
-            const svgDataUrl = await domtoimage.toSvg(target, {
-                bgcolor: 'transparent',
-                cacheBust: true,
-                width: W,
-                height: H
-            });
-
-            const markup = decodeSvgDataUrl(svgDataUrl);
-            downloadBlob(`Sber-Warper-${Date.now()}.svg`, markup, 'image/svg+xml;charset=utf-8');
+            const svg = buildGeneratorVectorSvg();
+            downloadBlob(`Sber-Warper-${Date.now()}.svg`, svg, 'image/svg+xml;charset=utf-8');
         }
 
         document.getElementById('btnPng').addEventListener('click', async () => {
