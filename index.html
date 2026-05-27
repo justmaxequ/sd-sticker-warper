@@ -68,12 +68,52 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         .file-upload-btn:hover { background: #F0F4FF; border-color: var(--accent-blue); color: var(--accent-blue); }
         input[type="file"] { display: none; }
 
-        /* Кнопки пресетов */
-        .presets-wrapper { display: flex; gap: 8px; margin-bottom: 8px; }
+        /* Кнопки пресетов — карточный стиль с акцентным активным состоянием */
+        .presets-wrapper { display: flex; gap: 8px; margin-bottom: 12px; }
         .presets-wrapper.wrap { flex-wrap: wrap; }
-        .preset-btn { flex: 1; background: var(--bg-element); border: 1px solid transparent; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 600; color: var(--text-main); cursor: pointer; transition: 0.2s; text-align: center; }
-        .preset-btn:hover { background: #E5E5EA; }
-        .preset-btn:active { transform: scale(0.98); }
+        .preset-btn {
+            flex: 1;
+            min-width: 0;
+            background: #fff;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            padding: 11px 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+            position: relative;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .preset-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: #F4F7FF;
+            box-shadow: 0 2px 8px rgba(0, 91, 255, 0.08);
+        }
+        .preset-btn:active { transform: scale(0.97); }
+        .preset-btn.is-active {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: linear-gradient(180deg, #EEF3FF 0%, #DDE7FF 100%);
+            box-shadow: 0 1px 0 rgba(0, 91, 255, 0.08) inset, 0 2px 8px rgba(0, 91, 255, 0.12);
+        }
+        .preset-btn.is-active::before {
+            content: '';
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            width: 6px;
+            height: 6px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px rgba(0, 91, 255, 0.15);
+        }
 
         /* Кнопки экспорта */
         .export-group { display: flex; gap: 8px; margin-top: auto; }
@@ -199,9 +239,9 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
 
             <div class="section-title" style="margin-top: 15px;">Пресеты генератора</div>
             <div class="presets-wrapper wrap">
-                <button class="preset-btn" onclick="applyGeneratorPreset('compact')">Компакт</button>
-                <button class="preset-btn" onclick="applyGeneratorPreset('balanced')">База</button>
-                <button class="preset-btn" onclick="applyGeneratorPreset('poster')">Постер</button>
+                <button class="preset-btn" data-gen-preset="compact" onclick="applyGeneratorPreset('compact')">Компакт</button>
+                <button class="preset-btn" data-gen-preset="balanced" onclick="applyGeneratorPreset('balanced')">База</button>
+                <button class="preset-btn" data-gen-preset="poster" onclick="applyGeneratorPreset('poster')">Постер</button>
             </div>
         </div>
 
@@ -209,9 +249,9 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             <div class="section-title">Настройки пространства</div>
 
             <div class="presets-wrapper wrap">
-                <button class="preset-btn" onclick="applyPreset(0, 0, 900, 1.0)">Фронт</button>
-                <button class="preset-btn" onclick="applyPreset(5, -19, 800, 1.0)">Макет</button>
-                <button class="preset-btn" onclick="applyPreset(15, -30, 600, 1.0)">Динамика</button>
+                <button class="preset-btn" data-view-preset="front" onclick="applyPreset(0, 0, 900, 1.0, 'front')">Фронт</button>
+                <button class="preset-btn" data-view-preset="layout" onclick="applyPreset(5, -19, 800, 1.0, 'layout')">Макет</button>
+                <button class="preset-btn" data-view-preset="dynamic" onclick="applyPreset(15, -30, 600, 1.0, 'dynamic')">Динамика</button>
             </div>
             
             <div class="control-group">
@@ -486,12 +526,25 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             apply3D();
         }
 
+        // Подсветка активного пресета
+        function highlightGenPreset(name) {
+            document.querySelectorAll('[data-gen-preset]').forEach(btn => {
+                btn.classList.toggle('is-active', btn.dataset.genPreset === (name || ''));
+            });
+        }
+        function highlightViewPreset(name) {
+            document.querySelectorAll('[data-view-preset]').forEach(btn => {
+                btn.classList.toggle('is-active', btn.dataset.viewPreset === (name || ''));
+            });
+        }
+
         // Применение ракурса (Пресеты)
-        window.applyPreset = function(rx, ry, persp, scale) {
+        window.applyPreset = function(rx, ry, persp, scale, name) {
             document.getElementById('sRx').value = rx;
             document.getElementById('sRy').value = ry;
             document.getElementById('sPersp').value = persp;
             document.getElementById('sScale').value = scale;
+            highlightViewPreset(name);
             apply3D();
         }
 
@@ -504,6 +557,7 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             document.getElementById('gPadBottom').value = preset.padBottom;
             document.getElementById('gKerning').value = preset.kerning;
             document.getElementById('gSpacing').value = preset.spacing;
+            highlightGenPreset(name);
             renderScene();
         }
 
@@ -524,46 +578,40 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         }
 
         // Слушатели ползунков
-        ['gText', 'gFs', 'gPad', 'gStretch', 'gPadBottom', 'gKerning', 'gSpacing'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
-        ['sPersp', 'sRx', 'sRy', 'sScale'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
+        ['gText', 'gFs', 'gPad', 'gStretch', 'gPadBottom', 'gKerning', 'gSpacing'].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('input', renderScene);
+            el.addEventListener('input', () => highlightGenPreset(null));
+        });
+        ['sPersp', 'sRx', 'sRy', 'sScale'].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('input', apply3D);
+            el.addEventListener('input', () => highlightViewPreset(null));
+        });
 
+        // ============ ЭКСПОРТ ============
+        // PNG: захватываем живую 3D-сцену из вьюпорта через dom-to-image и обрезаем по стикеру.
+        // SVG: отдаём чистый вектор — в режиме "Готовый макет" сохраняем исходный SVG,
+        //      в режиме "Генератор" пакуем плоский макет через domtoimage.toSvg.
         function downloadBlob(filename, content, type) {
             const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.download = filename;
-            link.href = url;
-            link.click();
-            URL.revokeObjectURL(url);
+            triggerDownload(filename, url);
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
         }
 
-        function downloadUrl(filename, url) {
+        function triggerDownload(filename, href) {
             const link = document.createElement('a');
             link.download = filename;
-            link.href = url;
+            link.href = href;
+            document.body.appendChild(link);
             link.click();
+            link.remove();
         }
 
         function setExportBusy(isBusy) {
             document.getElementById('btnPng').disabled = isBusy;
             document.getElementById('btnSvg').disabled = isBusy;
-        }
-
-        function escapeXmlAttr(value) {
-            return String(value)
-                .replace(/&/g, '&amp;')
-                .replace(/"/g, '&quot;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-        }
-
-        function getTargetSize() {
-            const width = Math.ceil(target.offsetWidth || target.scrollWidth || 800);
-            const height = Math.ceil(target.offsetHeight || target.scrollHeight || 600);
-            if (!width || !height) {
-                throw new Error('Нечего экспортировать: макет не получил размер.');
-            }
-            return { width, height };
         }
 
         function loadImage(src) {
@@ -575,226 +623,132 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             });
         }
 
-        function svgToDataUrl(markup) {
-            const encoded = btoa(unescape(encodeURIComponent(markup)));
-            return 'data:image/svg+xml;base64,' + encoded;
-        }
-
-        async function createFlatSource() {
+        async function waitForReady() {
             if (document.fonts && document.fonts.ready) {
-                await document.fonts.ready.catch(() => null);
+                try { await document.fonts.ready; } catch (e) { /* noop */ }
             }
-
-            const size = getTargetSize();
-            let dataUrl;
-
-            if (currentMode === 'pure' && pureFullSVG) {
-                dataUrl = svgToDataUrl(pureFullSVG);
-            } else {
-                dataUrl = await domtoimage.toPng(target, {
-                    width: size.width * EXPORT_SCALE,
-                    height: size.height * EXPORT_SCALE,
-                    bgcolor: 'transparent',
-                    cacheBust: true,
-                    style: {
-                        transform: `scale(${EXPORT_SCALE})`,
-                        transformOrigin: 'top left',
-                        width: size.width + 'px',
-                        height: size.height + 'px'
-                    }
-                });
-            }
-
-            const image = await loadImage(dataUrl);
-            return { ...size, dataUrl, image };
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
         }
 
-        function getExportTransformSettings() {
-            return {
-                perspective: Number(document.getElementById('sPersp').value) || 800,
-                rx: (Number(document.getElementById('sRx').value) || 0) * Math.PI / 180,
-                ry: (Number(document.getElementById('sRy').value) || 0) * Math.PI / 180,
-                scale: Number(document.getElementById('sScale').value) || 1
+        function decodeSvgDataUrl(dataUrl) {
+            // dom-to-image's toSvg returns "data:image/svg+xml;charset=utf-8,<markup>" where
+            // <markup> is NOT URL-encoded. So we mostly just strip the prefix; decodeURIComponent
+            // is only safe when the body actually contains percent-encoded escapes.
+            const utf8Prefix = 'data:image/svg+xml;charset=utf-8,';
+            const utf8PrefixAlt = 'data:image/svg+xml;utf8,';
+            const base64Prefix = 'data:image/svg+xml;base64,';
+            const safeDecode = (body) => {
+                if (!/%[0-9A-Fa-f]{2}/.test(body)) return body;
+                try { return decodeURIComponent(body); } catch (e) { return body; }
             };
-        }
-
-        function projectPoint(u, v, width, height, settings) {
-            let x = (u - width / 2) * settings.scale;
-            let y = (v - height / 2) * settings.scale;
-            let z = 0;
-
-            const cosY = Math.cos(settings.ry);
-            const sinY = Math.sin(settings.ry);
-            let nx = x * cosY + z * sinY;
-            let nz = -x * sinY + z * cosY;
-            x = nx;
-            z = nz;
-
-            const cosX = Math.cos(settings.rx);
-            const sinX = Math.sin(settings.rx);
-            const ny = y * cosX - z * sinX;
-            nz = y * sinX + z * cosX;
-            y = ny;
-            z = nz;
-
-            const perspective = Math.max(50, settings.perspective);
-            const factor = perspective / Math.max(1, perspective - z);
-            return { x: x * factor, y: y * factor, z };
-        }
-
-        function getProjectedCorners(width, height, settings) {
-            return [
-                projectPoint(0, 0, width, height, settings),
-                projectPoint(width, 0, width, height, settings),
-                projectPoint(width, height, width, height, settings),
-                projectPoint(0, height, width, height, settings)
-            ];
-        }
-
-        function getProjectedBounds(corners) {
-            const xs = corners.map(point => point.x);
-            const ys = corners.map(point => point.y);
-            return {
-                minX: Math.min(...xs),
-                maxX: Math.max(...xs),
-                minY: Math.min(...ys),
-                maxY: Math.max(...ys)
-            };
-        }
-
-        function compileShader(gl, type, source) {
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                throw new Error(gl.getShaderInfoLog(shader) || 'WebGL shader error');
+            if (dataUrl.startsWith(utf8Prefix)) return safeDecode(dataUrl.slice(utf8Prefix.length));
+            if (dataUrl.startsWith(utf8PrefixAlt)) return safeDecode(dataUrl.slice(utf8PrefixAlt.length));
+            if (dataUrl.startsWith(base64Prefix)) {
+                const b64 = dataUrl.slice(base64Prefix.length);
+                try { return decodeURIComponent(escape(atob(b64))); } catch (e) { return atob(b64); }
             }
-            return shader;
+            const comma = dataUrl.indexOf(',');
+            return comma >= 0 ? safeDecode(dataUrl.slice(comma + 1)) : dataUrl;
         }
 
-        function createWebglProgram(gl) {
-            const vertex = compileShader(gl, gl.VERTEX_SHADER, `
-                attribute vec4 a_position;
-                attribute vec2 a_texCoord;
-                varying vec2 v_texCoord;
-                void main() {
-                    gl_Position = a_position;
-                    v_texCoord = a_texCoord;
+        // === PNG ===
+        async function exportScenePng() {
+            await waitForReady();
+
+            const viewport = document.querySelector('.viewport');
+            if (!viewport) throw new Error('Не найдена рабочая сцена.');
+
+            const viewportRect = viewport.getBoundingClientRect();
+            const wrapperRect = wrapper.getBoundingClientRect();
+
+            if (!wrapperRect.width || !wrapperRect.height) {
+                throw new Error('Макет пуст — нечего экспортировать.');
+            }
+
+            const pad = EXPORT_PADDING;
+            const scale = EXPORT_SCALE;
+
+            // Область обрезки в координатах вьюпорта
+            const cropLeft = Math.max(0, Math.floor(wrapperRect.left - viewportRect.left - pad));
+            const cropTop = Math.max(0, Math.floor(wrapperRect.top - viewportRect.top - pad));
+            const cropRight = Math.min(viewportRect.width, Math.ceil(wrapperRect.right - viewportRect.left + pad));
+            const cropBottom = Math.min(viewportRect.height, Math.ceil(wrapperRect.bottom - viewportRect.top + pad));
+            const cropW = Math.max(1, cropRight - cropLeft);
+            const cropH = Math.max(1, cropBottom - cropTop);
+
+            const dataUrl = await domtoimage.toPng(viewport, {
+                bgcolor: 'transparent',
+                cacheBust: true,
+                width: Math.ceil(viewportRect.width * scale),
+                height: Math.ceil(viewportRect.height * scale),
+                filter: (node) => {
+                    // Сетка-пол только для превью, в экспорт не идёт
+                    return !(node && node.id === 'grid-floor');
+                },
+                style: {
+                    background: 'transparent',
+                    backgroundImage: 'none',
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    width: viewportRect.width + 'px',
+                    height: viewportRect.height + 'px'
                 }
-            `);
-            const fragment = compileShader(gl, gl.FRAGMENT_SHADER, `
-                precision mediump float;
-                uniform sampler2D u_image;
-                varying vec2 v_texCoord;
-                void main() {
-                    gl_FragColor = texture2D(u_image, v_texCoord);
+            });
+
+            const img = await loadImage(dataUrl);
+
+            const out = document.createElement('canvas');
+            out.width = Math.max(1, Math.round(cropW * scale));
+            out.height = Math.max(1, Math.round(cropH * scale));
+            const ctx = out.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(
+                img,
+                cropLeft * scale, cropTop * scale, cropW * scale, cropH * scale,
+                0, 0, out.width, out.height
+            );
+
+            triggerDownload(`Sber-Warper-${Date.now()}.png`, out.toDataURL('image/png'));
+        }
+
+        // === SVG ===
+        async function exportSceneSvg() {
+            if (currentMode === 'pure') {
+                if (!pureFullSVG) {
+                    throw new Error('Сначала загрузите SVG-макет.');
                 }
-            `);
-            const program = gl.createProgram();
-            gl.attachShader(program, vertex);
-            gl.attachShader(program, fragment);
-            gl.linkProgram(program);
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                throw new Error(gl.getProgramInfoLog(program) || 'WebGL program error');
-            }
-            return program;
-        }
-
-        function buildProjectedQuad(source, renderScale) {
-            const settings = getExportTransformSettings();
-            const corners = getProjectedCorners(source.width, source.height, settings);
-            const bounds = getProjectedBounds(corners);
-            const width = Math.ceil(bounds.maxX - bounds.minX + EXPORT_PADDING * 2);
-            const height = Math.ceil(bounds.maxY - bounds.minY + EXPORT_PADDING * 2);
-            const canvasWidth = Math.max(1, Math.ceil(width * renderScale));
-            const canvasHeight = Math.max(1, Math.ceil(height * renderScale));
-            const perspective = Math.max(50, settings.perspective);
-
-            const clipPoint = (point) => {
-                const px = (point.x - bounds.minX + EXPORT_PADDING) * renderScale;
-                const py = (point.y - bounds.minY + EXPORT_PADDING) * renderScale;
-                const ndcX = px / canvasWidth * 2 - 1;
-                const ndcY = 1 - py / canvasHeight * 2;
-                const w = Math.max(0.001, (perspective - point.z) / perspective);
-                return [ndcX * w, ndcY * w, 0, w];
-            };
-
-            const [tl, tr, br, bl] = corners.map(clipPoint);
-            return { width, height, canvasWidth, canvasHeight, positions: [...tl, ...tr, ...br, ...tl, ...br, ...bl] };
-        }
-
-        function renderProjectedCanvas(source, renderScale = EXPORT_SCALE) {
-            const quad = buildProjectedQuad(source, renderScale);
-            const canvas = document.createElement('canvas');
-            canvas.width = quad.canvasWidth;
-            canvas.height = quad.canvasHeight;
-
-            const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: true }) ||
-                canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: false, antialias: true });
-            if (!gl) {
-                throw new Error('WebGL недоступен, не могу сделать точный перспективный экспорт.');
+                const out = pureFullSVG.trimStart().startsWith('<?xml')
+                    ? pureFullSVG
+                    : `<?xml version="1.0" encoding="UTF-8"?>\n${pureFullSVG}`;
+                downloadBlob(`Sber-Warper-${Date.now()}.svg`, out, 'image/svg+xml;charset=utf-8');
+                return;
             }
 
-            const program = createWebglProgram(gl);
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            gl.clearColor(0, 0, 0, 0);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.useProgram(program);
+            // Генератор: отдаём плоский макет как self-contained SVG (foreignObject)
+            await waitForReady();
+            const rect = target.getBoundingClientRect();
+            const W = Math.max(1, Math.ceil(rect.width));
+            const H = Math.max(1, Math.ceil(rect.height));
 
-            const positionBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quad.positions), gl.STATIC_DRAW);
-            const positionLocation = gl.getAttribLocation(program, 'a_position');
-            gl.enableVertexAttribArray(positionLocation);
-            gl.vertexAttribPointer(positionLocation, 4, gl.FLOAT, false, 0, 0);
+            const svgDataUrl = await domtoimage.toSvg(target, {
+                bgcolor: 'transparent',
+                cacheBust: true,
+                width: W,
+                height: H
+            });
 
-            const texCoords = [
-                0, 0, 1, 0, 1, 1,
-                0, 0, 1, 1, 0, 1
-            ];
-            const texCoordBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texCoords), gl.STATIC_DRAW);
-            const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
-            gl.enableVertexAttribArray(texCoordLocation);
-            gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
-
-            const texture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source.image);
-
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-            return { canvas, width: quad.width, height: quad.height };
-        }
-
-        async function exportPerspectivePng() {
-            const source = await createFlatSource();
-            const rendered = renderProjectedCanvas(source, EXPORT_SCALE);
-            downloadUrl(`Sber-3D-${Date.now()}.png`, rendered.canvas.toDataURL('image/png'));
-        }
-
-        async function exportPerspectiveSvg() {
-            const source = await createFlatSource();
-            const rendered = renderProjectedCanvas(source, EXPORT_SCALE);
-            const href = escapeXmlAttr(rendered.canvas.toDataURL('image/png'));
-            const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${rendered.width}" height="${rendered.height}" viewBox="0 0 ${rendered.width} ${rendered.height}">
-    <image href="${href}" width="${rendered.width}" height="${rendered.height}" preserveAspectRatio="none" />
-</svg>`;
-            downloadBlob(`Sber-3D-SVG-${Date.now()}.svg`, svg, 'image/svg+xml;charset=utf-8');
+            const markup = decodeSvgDataUrl(svgDataUrl);
+            downloadBlob(`Sber-Warper-${Date.now()}.svg`, markup, 'image/svg+xml;charset=utf-8');
         }
 
         document.getElementById('btnPng').addEventListener('click', async () => {
             setExportBusy(true);
             try {
-                await exportPerspectivePng();
+                await exportScenePng();
             } catch (err) {
-                alert('Ошибка экспорта PNG: ' + err.message);
+                console.error(err);
+                alert('Ошибка экспорта PNG: ' + (err && err.message ? err.message : err));
             } finally {
                 setExportBusy(false);
             }
@@ -803,9 +757,10 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         document.getElementById('btnSvg').addEventListener('click', async () => {
             setExportBusy(true);
             try {
-                await exportPerspectiveSvg();
+                await exportSceneSvg();
             } catch (err) {
-                alert('Ошибка экспорта SVG: ' + err.message);
+                console.error(err);
+                alert('Ошибка экспорта SVG: ' + (err && err.message ? err.message : err));
             } finally {
                 setExportBusy(false);
             }
@@ -814,6 +769,9 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         // Инициализация
         setMode('pure');
         apply3D();
+        // Подсветка дефолтных пресетов
+        highlightGenPreset('balanced');
+        highlightViewPreset('layout');
     </script>
 </body>
 </html>
