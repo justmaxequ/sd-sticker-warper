@@ -931,96 +931,72 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             ctx.restore();
         }
 
+        // === Helpers: canvas → Blob/data-URL ===
+        // toBlob надёжнее чем toDataURL: не упирается в string-лимит браузера, не возвращает
+        // мусорные 'data:,' при больших полотнах, и даёт корректный размер файла.
+        function canvasToBlob(canvas, type, quality) {
+            return new Promise((resolve, reject) => {
+                if (!canvas || !canvas.width || !canvas.height) {
+                    reject(new Error('Полотно для экспорта пустое.'));
+                    return;
+                }
+                try {
+                    canvas.toBlob((blob) => {
+                        if (blob && blob.size > 0) resolve(blob);
+                        else reject(new Error('Не удалось преобразовать полотно в файл.'));
+                    }, type || 'image/png', quality);
+                } catch (e) { reject(e); }
+            });
+        }
+
+        function blobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('Не удалось прочитать blob.'));
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        // Готовим перспективный 3D-варп — общий шаг для PNG и SVG.
+        async function buildPerspectiveCanvas() {
+            const flat = await rasterizeFlatTarget();
+            if (!flat || !flat.canvas || !flat.canvas.width || !flat.canvas.height) {
+                throw new Error('Не удалось подготовить плоский макет (пустое полотно).');
+            }
+            const warped = warpToPerspective(flat);
+            if (!warped || warped.width < 4 || warped.height < 4) {
+                throw new Error('Стикер слишком мал — нечего экспортировать.');
+            }
+            return warped;
+        }
+
         // === PNG ===
         async function exportScenePng() {
-            const flat = await rasterizeFlatTarget();
-            const warped = warpToPerspective(flat);
-            triggerDownload(`Sber-Warper-${Date.now()}.png`, warped.toDataURL('image/png'));
+            const warped = await buildPerspectiveCanvas();
+            const blob = await canvasToBlob(warped, 'image/png');
+            const url = URL.createObjectURL(blob);
+            triggerDownload(`Sber-Warper-${Date.now()}.png`, url);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
 
-        // === SVG: настоящий вектор ===
-        function buildGeneratorVectorSvg() {
-            const text = document.getElementById('gText').value.replace(/\\n/g, '\n');
-            const bg = document.getElementById('gBg').value;
-            const tc = document.getElementById('gTc').value;
-            const fs = parseFloat(document.getElementById('gFs').value);
-            const pad = parseFloat(document.getElementById('gPad').value);
-            const stretch = parseFloat(document.getElementById('gStretch').value) / 100;
-            const padBottom = parseFloat(document.getElementById('gPadBottom').value);
-            const kerning = parseFloat(document.getElementById('gKerning').value);
-            const spacing = parseFloat(document.getElementById('gSpacing').value);
-            const { offX = 0, offY = 0 } = generatorPreset;
-
-            const rect = target.getBoundingClientRect();
-            const W = Math.max(1, Math.ceil(rect.width));
-            const H = Math.max(1, Math.ceil(rect.height));
-
-            // Берём live font-family у content-layer (или подставляем sans-serif)
-            const contentLayer = target.querySelector('#content-layer');
-            const liveFontFamily = contentLayer
-                ? getComputedStyle(contentLayer).fontFamily
-                : (getComputedStyle(document.documentElement).getPropertyValue('--font-sticker') || 'sans-serif');
-            const fontFamily = (liveFontFamily || 'sans-serif').trim() || 'sans-serif';
-
-            // Фон: либо кастомный SVG, либо скруглённый прямоугольник
-            let bgEl;
-            if (customBgSVG) {
-                const inner = stripFillAttrsInSvgInner(customBgSVG.content);
-                bgEl = `<svg x="0" y="0" width="${W}" height="${H}" viewBox="${escapeXmlAttr(customBgSVG.viewBox)}" preserveAspectRatio="none" fill="${escapeXmlAttr(bg)}">${inner}</svg>`;
-            } else {
-                const radius = Math.min(200, Math.min(W, H) / 2);
-                bgEl = `<rect x="0" y="0" width="${W}" height="${H}" rx="${radius}" ry="${radius}" fill="${escapeXmlAttr(bg)}"/>`;
-            }
-
-            // Текст
-            const lines = text.split('\n');
-            const lineHeight = fs * spacing;
-            const totalH = lineHeight * lines.length;
-            const py = Math.round(pad * 0.58);
-            const top = py;
-            const bottom = H - Math.max(0, py + padBottom);
-            const cx = W / 2 + offX;
-            const cy = (top + bottom) / 2 + offY;
-            const startY = cy - totalH / 2 + lineHeight / 2;
-
-            const textLines = lines.map((line, i) => {
-                const yPos = startY + i * lineHeight;
-                return `<text x="${cx}" y="${yPos}" font-family="${escapeXmlAttr(fontFamily)}" font-size="${fs}" font-weight="900" letter-spacing="${kerning}" fill="${escapeXmlAttr(tc)}" text-anchor="middle" dominant-baseline="central">${escapeXml(line)}</text>`;
-            }).join('\n  ');
-
-            const textGroup = Math.abs(stretch - 1) < 1e-3
-                ? textLines
-                : `<g transform="translate(${cx} ${cy}) scale(${stretch} 1) translate(${-cx} ${-cy})">\n  ${textLines}\n  </g>`;
-
-            // Встраиваем кастомный шрифт чтобы SVG был самодостаточным
-            let fontEmbed = '';
-            if (customFontDataUrl && /CustomFont/i.test(fontFamily)) {
-                const css = `@font-face { font-family: 'CustomFont'; src: url('${customFontDataUrl}'); font-weight: 100 900; font-style: normal; }`;
-                fontEmbed = `<defs><style type="text/css"><![CDATA[\n${css}\n]]></style></defs>`;
-            }
-
-            return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="${SVG_NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  ${fontEmbed}
-  ${bgEl}
-  ${textGroup}
-</svg>`;
-        }
-
+        // === SVG: тот же 3D-варп, упакованный в реальный SVG-файл ===
+        // SVG получает перспективное искажение через встроенный PNG (<image href="data:...">).
+        // Это даёт WYSIWYG: открывается одинаково в Figma / Illustrator / браузерах / iOS Preview
+        // и форма стикера совпадает с превью. Чистого вектора с настоящей 3D-перспективой в
+        // SVG не сделать (SVG поддерживает только 2D affine), поэтому самый честный способ —
+        // вектор-обёртка вокруг растрового результата того же 3D-расчёта что и PNG.
         async function exportSceneSvg() {
-            if (currentMode === 'pure') {
-                if (!pureFullSVG) {
-                    throw new Error('Сначала загрузите SVG-макет.');
-                }
-                const out = pureFullSVG.trimStart().startsWith('<?xml')
-                    ? pureFullSVG
-                    : `<?xml version="1.0" encoding="UTF-8"?>\n${pureFullSVG}`;
-                downloadBlob(`Sber-Warper-${Date.now()}.svg`, out, 'image/svg+xml;charset=utf-8');
-                return;
-            }
+            const warped = await buildPerspectiveCanvas();
+            const pngBlob = await canvasToBlob(warped, 'image/png');
+            const pngDataUrl = await blobToDataUrl(pngBlob);
 
-            await waitForReady();
-            const svg = buildGeneratorVectorSvg();
+            const W = warped.width;
+            const H = warped.height;
+            const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <image x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none" href="${pngDataUrl}" xlink:href="${pngDataUrl}"/>
+</svg>`;
             downloadBlob(`Sber-Warper-${Date.now()}.svg`, svg, 'image/svg+xml;charset=utf-8');
         }
 
