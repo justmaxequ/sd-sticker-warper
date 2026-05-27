@@ -26,7 +26,6 @@
 
 /* Принудительно убираем все жирные (700+) стили, если они остались */
 h1, h2, h3, b, strong { font-weight: 600 !important; }
-        }
 
         * { box-sizing: border-box; font-family: var(--font-ui); }
         body { margin: 0; padding: 0; background: var(--bg-element); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
@@ -71,6 +70,7 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
 
         /* Кнопки пресетов */
         .presets-wrapper { display: flex; gap: 8px; margin-bottom: 8px; }
+        .presets-wrapper.wrap { flex-wrap: wrap; }
         .preset-btn { flex: 1; background: var(--bg-element); border: 1px solid transparent; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 600; color: var(--text-main); cursor: pointer; transition: 0.2s; text-align: center; }
         .preset-btn:hover { background: #E5E5EA; }
         .preset-btn:active { transform: scale(0.98); }
@@ -99,10 +99,10 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         #content-layer { position: relative; z-index: 2; font-family: var(--font-sticker); font-weight: 900; line-height: 1.1; white-space: pre-wrap; text-align: center; display: flex; justify-content: center; align-items: center; transition: padding 0.1s ease; }
         #custom-svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
         #custom-svg-layer svg { width: 100%; height: 100%; display: block; overflow: visible; }
-        #custom-svg-layer path, #custom-svg-layer rect, #custom-svg-layer polygon { fill: var(--custom-svg-fill) !important; transition: fill 0.2s; }
+        #custom-svg-layer path, #custom-svg-layer rect, #custom-svg-layer polygon, #custom-svg-layer circle, #custom-svg-layer ellipse, #custom-svg-layer polyline { fill: var(--custom-svg-fill) !important; transition: fill 0.2s; }
         
-        #pure-svg-layer { display: block; width: 100%; height: 100%; }
-        #pure-svg-layer svg { width: 100%; height: auto; max-width: 900px; display: block; overflow: visible; }
+        #pure-svg-layer { display: block; width: auto; height: auto; }
+        #pure-svg-layer svg { width: auto; height: auto; max-width: min(900px, 72vw); max-height: 72vh; display: block; overflow: visible; }
     </style>
 </head>
 <body>
@@ -124,11 +124,6 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
                 </label>
             </div>
 
-            <div class="section-title" style="margin-top: 24px;">Ракурсы (Пресеты)</div>
-            <div class="presets-wrapper">
-                <button class="preset-btn" onclick="applyPreset(5, -19, 800, 1.0)">Как в макете</button>
-                <button class="preset-btn" onclick="applyPreset(15, -30, 600, 1.0)">Динамичный</button>
-            </div>
         </div>
 
         <div id="mode-generator" style="display: none;">
@@ -174,37 +169,27 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
                 <input type="range" id="gFs" min="20" max="100" value="65">
             </div>
 
-            <div class="grid-2">
-                <div class="control-group">
-                    <label class="control-row"><span>Отступ (Бока)</span><span id="v-px">70px</span></label>
-                    <input type="range" id="gPx" min="-50" max="150" value="70">
-                </div>
-                <div class="control-group">
-                    <label class="control-row"><span>Отступ (Верх)</span><span id="v-py">40px</span></label>
-                    <input type="range" id="gPy" min="-50" max="100" value="40">
-                </div>
-            </div>
-            
-            <div class="grid-2">
-                <div class="control-group">
-                    <label class="control-row"><span>Кернинг</span><span id="v-kerning">-2px</span></label>
-                    <input type="range" id="gKerning" min="-10" max="10" value="-2">
-                </div>
-                <div class="control-group">
-                    <label class="control-row"><span>Спейсинг</span><span id="v-spacing">1.1</span></label>
-                    <input type="range" id="gSpacing" min="0.5" max="2" step="0.05" value="1.1">
-                </div>
+            <div class="control-group">
+                <label class="control-row"><span>Отступы</span><span id="v-pad">70px</span></label>
+                <input type="range" id="gPad" min="0" max="150" value="70">
             </div>
 
-            <div class="control-group" style="margin-top: 15px;">
-                <label class="control-row" style="color: var(--accent-blue); margin-bottom: 5px;"><span>Смещение текста (X/Y)</span></label>
-                <input type="range" id="gOffX" min="-80" max="80" value="0">
-                <input type="range" id="gOffY" min="-80" max="80" value="-12" style="margin-top: 5px;">
+            <div class="section-title" style="margin-top: 15px;">Пресеты генератора</div>
+            <div class="presets-wrapper wrap">
+                <button class="preset-btn" onclick="applyGeneratorPreset('compact')">Компакт</button>
+                <button class="preset-btn" onclick="applyGeneratorPreset('balanced')">База</button>
+                <button class="preset-btn" onclick="applyGeneratorPreset('poster')">Постер</button>
             </div>
         </div>
 
         <div style="border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 15px;">
             <div class="section-title">Настройки пространства</div>
+
+            <div class="presets-wrapper wrap">
+                <button class="preset-btn" onclick="applyPreset(0, 0, 900, 1.0)">Фронт</button>
+                <button class="preset-btn" onclick="applyPreset(5, -19, 800, 1.0)">Макет</button>
+                <button class="preset-btn" onclick="applyPreset(15, -30, 600, 1.0)">Динамика</button>
+            </div>
             
             <div class="control-group">
                 <label class="control-row"><span>Масштаб (Zoom)</span><span id="v-scale">1.0x</span></label>
@@ -225,10 +210,6 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
                     <label class="control-row"><span>Поворот Y</span><span id="v-ry">-19°</span></label>
                     <input type="range" id="sRy" min="-85" max="85" value="-19">
                 </div>
-            </div>
-            <div class="control-group">
-                <label class="control-row"><span>Вращение Z</span><span id="v-rz">0°</span></label>
-                <input type="range" id="sRz" min="-180" max="180" value="0">
             </div>
         </div>
 
@@ -263,6 +244,13 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         let currentMode = 'pure';
         let customBgSVG = null;
         let pureFullSVG = null;
+        const GENERATOR_PRESETS = {
+            compact: { fs: 56, pad: 44, kerning: -1, spacing: 1.05, offX: 0, offY: -6 },
+            balanced: { fs: 65, pad: 70, kerning: -2, spacing: 1.1, offX: 0, offY: -12 },
+            poster: { fs: 82, pad: 92, kerning: -3, spacing: 0.95, offX: 0, offY: -10 }
+        };
+        let generatorPreset = { ...GENERATOR_PRESETS.balanced };
+        const EXPORT_PADDING = 64;
 
         // Синхронизация Color Pickers
         function syncColorPicker(inputId, hexId) {
@@ -286,6 +274,69 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         syncColorPicker('gBg', 'gBgHex');
         syncColorPicker('gTc', 'gTcHex');
 
+        function parseSvgLength(value) {
+            if (!value) return null;
+            const match = String(value).match(/-?\d*\.?\d+/);
+            return match ? Number(match[0]) : null;
+        }
+
+        function sanitizeImportedSvg(svgEl) {
+            svgEl.querySelectorAll('script').forEach(node => node.remove());
+            [svgEl, ...svgEl.querySelectorAll('*')].forEach(node => {
+                [...node.attributes].forEach(attr => {
+                    const name = attr.name.toLowerCase();
+                    const value = attr.value.trim();
+                    if (name.startsWith('on') || ((name === 'href' || name === 'xlink:href') && /^javascript:/i.test(value))) {
+                        node.removeAttribute(attr.name);
+                    }
+                });
+            });
+        }
+
+        function normalizeSvgSource(rawSvg) {
+            const doc = new DOMParser().parseFromString(rawSvg, 'image/svg+xml');
+            if (doc.querySelector('parsererror')) {
+                throw new Error('Не удалось прочитать SVG. Проверьте файл и попробуйте снова.');
+            }
+
+            const svgEl = doc.querySelector('svg');
+            if (!svgEl) {
+                throw new Error('В файле не найден корневой тег <svg>.');
+            }
+
+            sanitizeImportedSvg(svgEl);
+            svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+            let viewBox = svgEl.getAttribute('viewBox');
+            let width = parseSvgLength(svgEl.getAttribute('width'));
+            let height = parseSvgLength(svgEl.getAttribute('height'));
+
+            if (!viewBox && width && height) {
+                viewBox = `0 0 ${width} ${height}`;
+                svgEl.setAttribute('viewBox', viewBox);
+            }
+
+            if (viewBox) {
+                const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+                if (parts.length === 4 && parts.every(Number.isFinite)) {
+                    width = width || parts[2];
+                    height = height || parts[3];
+                }
+            }
+
+            if (width) svgEl.setAttribute('width', String(width));
+            if (height) svgEl.setAttribute('height', String(height));
+            svgEl.setAttribute('preserveAspectRatio', svgEl.getAttribute('preserveAspectRatio') || 'xMidYMid meet');
+            svgEl.style.display = 'block';
+            svgEl.style.overflow = 'visible';
+
+            return {
+                markup: svgEl.outerHTML,
+                content: svgEl.innerHTML,
+                viewBox: svgEl.getAttribute('viewBox') || '0 0 100 100'
+            };
+        }
+
         // Переключение режимов
         function setMode(mode) {
             currentMode = mode;
@@ -296,29 +347,25 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             renderScene();
         }
 
-        // Загрузка SVG (Готовый макет) - Умный парсер
+        // Загрузка SVG (Готовый макет)
         document.getElementById('pureSvgInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; 
             if (!file) return;
-            document.getElementById('pure-svg-label').innerText = '✅ Файл загружен';
+            document.getElementById('pure-svg-label').innerText = `Загрузка: ${file.name}`;
             
             const reader = new FileReader(); 
             reader.onload = function(e) {
-                const rawSvg = e.target.result;
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(rawSvg, "image/svg+xml");
-                const svgEl = doc.querySelector('svg');
-                
-                if (svgEl) {
-                    // Убираем жесткие размеры, чтобы плашка слушалась нашего масштаба
-                    svgEl.removeAttribute('width');
-                    svgEl.removeAttribute('height');
-                    pureFullSVG = svgEl.outerHTML;
-                } else {
-                    pureFullSVG = rawSvg;
+                try {
+                    pureFullSVG = normalizeSvgSource(e.target.result).markup;
+                    document.getElementById('pure-svg-label').innerText = `✅ ${file.name}`;
+                    renderScene();
+                } catch (err) {
+                    pureFullSVG = null;
+                    document.getElementById('pure-svg-label').innerText = '+ Загрузить макет (.svg)';
+                    alert(err.message);
                 }
-                renderScene();
             }; 
+            reader.onerror = () => alert('Не удалось прочитать файл.');
             reader.readAsText(file);
         });
 
@@ -335,11 +382,18 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
 
         document.getElementById('customShapeInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; if (!file) return;
-            document.getElementById('svg-name-label').innerText = '✅ Фон загружен';
+            document.getElementById('svg-name-label').innerText = `Загрузка: ${file.name}`;
             const reader = new FileReader(); reader.onload = function(e) {
-                const doc = new DOMParser().parseFromString(e.target.result, "image/svg+xml");
-                const svgEl = doc.querySelector('svg');
-                if (svgEl) { customBgSVG = { viewBox: svgEl.getAttribute('viewBox') || '0 0 100 100', content: svgEl.innerHTML }; renderScene(); } 
+                try {
+                    const svg = normalizeSvgSource(e.target.result);
+                    customBgSVG = { viewBox: svg.viewBox, content: svg.content };
+                    document.getElementById('svg-name-label').innerText = `✅ ${file.name}`;
+                    renderScene();
+                } catch (err) {
+                    customBgSVG = null;
+                    document.getElementById('svg-name-label').innerText = '💠 SVG Фон';
+                    alert(err.message);
+                }
             }; reader.readAsText(file);
         });
 
@@ -347,41 +401,42 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         function renderScene() {
             target.innerHTML = '';
             target.style.background = 'transparent';
+            target.style.borderRadius = '';
 
             if (currentMode === 'generator') {
                 const text = document.getElementById('gText').value.replace(/\\n/g, '\n');
                 const bg = document.getElementById('gBg').value;
                 const tc = document.getElementById('gTc').value;
                 const fs = document.getElementById('gFs').value;
-                const px = parseInt(document.getElementById('gPx').value);
-                const py = parseInt(document.getElementById('gPy').value);
-                const offX = document.getElementById('gOffX').value;
-                const offY = document.getElementById('gOffY').value;
-                const kerning = document.getElementById('gKerning').value;
-                const spacing = document.getElementById('gSpacing').value;
+                const pad = parseInt(document.getElementById('gPad').value, 10);
+                const px = pad;
+                const py = Math.round(pad * 0.58);
+                const { offX, offY, kerning, spacing } = generatorPreset;
 
-                const padX = Math.max(0, px); const marX = Math.min(0, px);
-                const padY = Math.max(0, py); const marY = Math.min(0, py);
-
+                document.getElementById('v-fs').innerText = fs + 'px';
+                document.getElementById('v-pad').innerText = pad + 'px';
                 document.documentElement.style.setProperty('--custom-svg-fill', bg);
 
-                let bgLayer = '';
                 if (customBgSVG) {
-                    bgLayer = `<div id="custom-svg-layer"><svg viewBox="${customBgSVG.viewBox}" preserveAspectRatio="none">${customBgSVG.content}</svg></div>`;
+                    const bgLayer = document.createElement('div');
+                    bgLayer.id = 'custom-svg-layer';
+                    bgLayer.innerHTML = `<svg viewBox="${customBgSVG.viewBox}" preserveAspectRatio="none">${customBgSVG.content}</svg>`;
+                    target.appendChild(bgLayer);
                 } else {
-                    target.style.background = bg; target.style.borderRadius = '200px';
+                    target.style.background = bg;
+                    target.style.borderRadius = '200px';
                 }
 
-                target.innerHTML = `
-                    ${bgLayer}
-                    <div id="content-layer" style="
-                        color: ${tc}; font-size: ${fs}px; 
-                        letter-spacing: ${kerning}px; line-height: ${spacing};
-                        padding: ${padY}px ${padX}px; margin: ${marY}px ${marX}px;
-                        transform: translate(${offX}px, ${offY}px);">
-                        ${text}
-                    </div>
-                `;
+                const contentLayer = document.createElement('div');
+                contentLayer.id = 'content-layer';
+                contentLayer.textContent = text;
+                contentLayer.style.color = tc;
+                contentLayer.style.fontSize = fs + 'px';
+                contentLayer.style.letterSpacing = kerning + 'px';
+                contentLayer.style.lineHeight = spacing;
+                contentLayer.style.padding = `${py}px ${px}px`;
+                contentLayer.style.transform = `translate(${offX}px, ${offY}px)`;
+                target.appendChild(contentLayer);
             } else {
                 if (pureFullSVG) {
                     target.innerHTML = `<div id="pure-svg-layer">${pureFullSVG}</div>`;
@@ -398,8 +453,15 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             document.getElementById('sRy').value = ry;
             document.getElementById('sPersp').value = persp;
             document.getElementById('sScale').value = scale;
-            document.getElementById('sRz').value = 0;
             apply3D();
+        }
+
+        window.applyGeneratorPreset = function(name) {
+            const preset = GENERATOR_PRESETS[name] || GENERATOR_PRESETS.balanced;
+            generatorPreset = { ...preset };
+            document.getElementById('gFs').value = preset.fs;
+            document.getElementById('gPad').value = preset.pad;
+            renderScene();
         }
 
         // Логика 3D (Правильная архитектура: perspective на родителе, rotate на потомке)
@@ -407,61 +469,140 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             const p = document.getElementById('sPersp').value;
             const rx = document.getElementById('sRx').value;
             const ry = document.getElementById('sRy').value;
-            const rz = document.getElementById('sRz').value;
             const scale = document.getElementById('sScale').value;
 
             document.getElementById('v-persp').innerText = p + 'px';
             document.getElementById('v-rx').innerText = rx + '°';
             document.getElementById('v-ry').innerText = ry + '°';
-            document.getElementById('v-rz').innerText = rz + '°';
             document.getElementById('v-scale').innerText = parseFloat(scale).toFixed(1) + 'x';
 
             exportContainer.style.perspective = p + 'px';
-            wrapper.style.transform = `scale(${scale}) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+            wrapper.style.transform = `scale(${scale}) rotateX(${rx}deg) rotateY(${ry}deg)`;
         }
 
         // Слушатели ползунков
-        ['gText', 'gFs', 'gPx', 'gPy', 'gOffX', 'gOffY', 'gKerning', 'gSpacing'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
-        ['sPersp', 'sRx', 'sRy', 'sRz', 'sScale'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
+        ['gText', 'gFs', 'gPad'].forEach(id => document.getElementById(id).addEventListener('input', renderScene));
+        ['sPersp', 'sRx', 'sRy', 'sScale'].forEach(id => document.getElementById(id).addEventListener('input', apply3D));
 
-        // ИДЕАЛЬНЫЙ ЭКСПОРТ PNG
-        document.getElementById('btnPng').addEventListener('click', () => {
-            const scale = 2; // Внутренний зум для высокого разрешения
-            
-            domtoimage.toPng(exportContainer, { 
-                width: exportContainer.clientWidth * scale, 
-                height: exportContainer.clientHeight * scale, 
-                style: { 
-                    transform: `scale(${scale})`, 
-                    transformOrigin: 'top left' 
-                } 
-            })
-            .then(url => { 
-                const a = document.createElement('a'); 
-                a.download = `Sber-3D-${Date.now()}.png`; 
-                a.href = url; a.click(); 
-            })
-            .catch(err => alert("Ошибка экспорта PNG: " + err));
-        });
+        function copyRootCssVariables(node) {
+            const computed = getComputedStyle(document.documentElement);
+            ['--bg-element', '--border-color', '--accent-blue', '--text-main', '--text-muted', '--font-ui', '--font-sticker', '--custom-svg-fill'].forEach(prop => {
+                const value = computed.getPropertyValue(prop);
+                if (value) node.style.setProperty(prop, value);
+            });
+        }
 
-        // ЭКСПОРТ SVG (С внедрением 3D стилей)
-        document.getElementById('btnSvg').addEventListener('click', () => {
-            const w = target.offsetWidth || 800;
-            const h = target.offsetHeight || 600;
-            const content = currentMode === 'pure' && pureFullSVG ? pureFullSVG : target.innerHTML; 
-            
-            // Оборачиваем SVG с сохранением 3D-матрицы в <g>
-            const finalSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w*1.5}" height="${h*1.5}" viewBox="-${w/4} -${h/4} ${w*1.5} ${h*1.5}">
-                <g style="transform: ${wrapper.style.transform}; transform-origin: center;">
-                    ${content}
-                </g>
-            </svg>`;
-            
-            const blob = new Blob([finalSvg], {type: 'image/svg+xml;charset=utf-8'});
+        function createExportSnapshot() {
+            apply3D();
+            const rect = wrapper.getBoundingClientRect();
+            const fallbackWidth = target.offsetWidth || 800;
+            const fallbackHeight = target.offsetHeight || 600;
+            const width = Math.ceil(Math.max(rect.width, fallbackWidth) + EXPORT_PADDING * 2);
+            const height = Math.ceil(Math.max(rect.height, fallbackHeight) + EXPORT_PADDING * 2);
+
+            const host = document.createElement('div');
+            host.style.position = 'fixed';
+            host.style.left = '-100000px';
+            host.style.top = '0';
+            host.style.pointerEvents = 'none';
+            host.style.zIndex = '-1';
+
+            const stage = document.createElement('div');
+            stage.className = 'export-stage';
+            stage.style.width = width + 'px';
+            stage.style.height = height + 'px';
+            stage.style.display = 'flex';
+            stage.style.alignItems = 'center';
+            stage.style.justifyContent = 'center';
+            stage.style.overflow = 'visible';
+            stage.style.background = 'transparent';
+            stage.style.perspective = exportContainer.style.perspective;
+            stage.style.transformStyle = 'preserve-3d';
+            copyRootCssVariables(stage);
+
+            const clonedWrapper = wrapper.cloneNode(true);
+            clonedWrapper.style.transform = wrapper.style.transform;
+            clonedWrapper.style.transformOrigin = 'center center';
+            clonedWrapper.style.transformStyle = 'preserve-3d';
+            stage.appendChild(clonedWrapper);
+
+            host.appendChild(stage);
+            document.body.appendChild(host);
+            return { host, stage, width, height, cleanup: () => host.remove() };
+        }
+
+        function downloadBlob(filename, content, type) {
+            const blob = new Blob([content], { type });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.download = `Sber-3D-Vector-${Date.now()}.svg`;
-            link.href = url; link.click(); URL.revokeObjectURL(url);
+            link.download = filename;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function collectExportStyles() {
+            return [...document.querySelectorAll('style')]
+                .map(style => style.textContent)
+                .join('\n');
+        }
+
+        function serializeSnapshotToSvg(stage, width, height) {
+            const clone = stage.cloneNode(true);
+            clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+            clone.style.position = 'relative';
+
+            const style = document.createElement('style');
+            style.textContent = collectExportStyles();
+            clone.insertBefore(style, clone.firstChild);
+
+            const xhtml = new XMLSerializer().serializeToString(clone);
+            return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <foreignObject x="0" y="0" width="${width}" height="${height}">
+        ${xhtml}
+    </foreignObject>
+</svg>`;
+        }
+
+        // Экспорт PNG: сохраняем только объект с нужным отступом, без сетки и лишней сцены.
+        document.getElementById('btnPng').addEventListener('click', () => {
+            const snapshot = createExportSnapshot();
+            const scale = 2;
+
+            domtoimage.toPng(snapshot.stage, {
+                width: snapshot.width * scale,
+                height: snapshot.height * scale,
+                bgcolor: 'transparent',
+                cacheBust: true,
+                style: {
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    width: snapshot.width + 'px',
+                    height: snapshot.height + 'px'
+                }
+            })
+            .then(url => {
+                const a = document.createElement('a');
+                a.download = `Sber-3D-${Date.now()}.png`;
+                a.href = url;
+                a.click();
+            })
+            .catch(err => alert("Ошибка экспорта PNG: " + err))
+            .finally(snapshot.cleanup);
+        });
+
+        // Экспорт SVG: standalone-файл с тем же визуальным кадром, что и PNG.
+        document.getElementById('btnSvg').addEventListener('click', () => {
+            const snapshot = createExportSnapshot();
+            try {
+                const finalSvg = serializeSnapshotToSvg(snapshot.stage, snapshot.width, snapshot.height);
+                downloadBlob(`Sber-3D-Vector-${Date.now()}.svg`, finalSvg, 'image/svg+xml;charset=utf-8');
+            } catch (err) {
+                alert("Ошибка экспорта SVG: " + err);
+            } finally {
+                snapshot.cleanup();
+            }
         });
 
         // Инициализация
