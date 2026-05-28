@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SberDevices Warper | PRO Studio</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -124,6 +124,34 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
 
         /* Рабочая сцена */
         .viewport { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; background: radial-gradient(circle at center, #ffffff 0%, #E5E5EA 100%); position: relative; }
+
+        /* Визуальная рамка «Область экспорта» */
+        #export-frame {
+            position: absolute;
+            border: 2px dashed var(--accent-blue);
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 6;
+            box-sizing: border-box;
+            display: none;
+            transition: opacity 0.15s ease;
+        }
+        #export-frame.is-visible { display: block; }
+        #export-frame::before {
+            content: 'Область экспорта';
+            position: absolute;
+            top: -26px;
+            left: 0;
+            background: var(--accent-blue);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 91, 255, 0.22);
+        }
         
         /* КОНТЕЙНЕР ДЛЯ ЭКСПОРТА */
         #export-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; overflow: visible; }
@@ -284,7 +312,8 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
 
     <div class="viewport">
         <div id="grid-floor"></div>
-        
+        <div id="export-frame"></div>
+
         <div id="export-container">
             <div id="transform-wrapper">
                 <div id="sticker-target">
@@ -579,7 +608,35 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
 
             exportContainer.style.perspective = p + 'px';
             wrapper.style.transform = `scale(${scale}) rotateX(${rx}deg) rotateY(${ry}deg)`;
+
+            // После смены трансформа надо подвинуть рамку «Область экспорта».
+            // requestAnimationFrame — чтобы браузер успел применить transform до измерений.
+            requestAnimationFrame(updateExportFrame);
         }
+
+        // Визуальная рамка «Область экспорта»: показывает на превью что именно попадёт в файл.
+        function updateExportFrame() {
+            const frame = document.getElementById('export-frame');
+            const viewport = document.querySelector('.viewport');
+            if (!frame || !viewport || !wrapper) return;
+
+            const vRect = viewport.getBoundingClientRect();
+            const wRect = wrapper.getBoundingClientRect();
+
+            if (!wRect.width || !wRect.height || (currentMode === 'pure' && !pureFullSVG)) {
+                frame.classList.remove('is-visible');
+                return;
+            }
+
+            const pad = EXPORT_PADDING;
+            frame.classList.add('is-visible');
+            frame.style.left = (wRect.left - vRect.left - pad) + 'px';
+            frame.style.top  = (wRect.top  - vRect.top  - pad) + 'px';
+            frame.style.width  = (wRect.width  + pad * 2) + 'px';
+            frame.style.height = (wRect.height + pad * 2) + 'px';
+        }
+
+        window.addEventListener('resize', () => requestAnimationFrame(updateExportFrame));
 
         // Слушатели ползунков
         ['gText', 'gFs', 'gPad', 'gStretch', 'gPadBottom', 'gKerning', 'gSpacing'].forEach(id => {
@@ -744,13 +801,47 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             ctx.restore();
         }
 
+        // Снимаем именно тот плоский стикер что видно на экране (без 3D).
+        // Главное — берём пиксели через html-to-image, который рендерит DOM теми же CSS-правилами
+        // что и сам браузер. Это даёт WYSIWYG для генератор-режима и для уже загруженного SVG.
+        // На случай если CDN библиотеки отвалится, есть fallback на ручной рендер.
         async function rasterizeFlatTarget() {
             await waitForReady();
+
+            if (currentMode === 'pure' && !pureFullSVG) {
+                throw new Error('Сначала загрузите SVG-макет.');
+            }
+
             const rect = target.getBoundingClientRect();
             const W = Math.max(1, Math.ceil(rect.width));
             const H = Math.max(1, Math.ceil(rect.height));
             const scale = EXPORT_SCALE;
 
+            // Основной путь: html-to-image (точное CSS-рендеринг).
+            if (typeof htmlToImage !== 'undefined' && htmlToImage && typeof htmlToImage.toCanvas === 'function') {
+                try {
+                    const captured = await htmlToImage.toCanvas(target, {
+                        pixelRatio: scale,
+                        cacheBust: true,
+                        // Никакого backgroundColor — иначе зальёт прозрачный фон вокруг плашки.
+                        skipFonts: false
+                    });
+                    // html-to-image иногда возвращает canvas размера W*scale × H*scale, иногда чуть больше.
+                    // Нормализуем к строго W*scale × H*scale чтобы дальше варп считал правильные UV.
+                    const canvas = document.createElement('canvas');
+                    canvas.width = W * scale;
+                    canvas.height = H * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(captured, 0, 0, canvas.width, canvas.height);
+                    return { canvas, cssW: W, cssH: H };
+                } catch (e) {
+                    console.warn('html-to-image не сработал, переключаюсь на ручной рендер:', e);
+                }
+            }
+
+            // Fallback (если CDN не доступен или html-to-image кинул ошибку).
             const canvas = document.createElement('canvas');
             canvas.width = W * scale;
             canvas.height = H * scale;
@@ -759,7 +850,6 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             ctx.imageSmoothingQuality = 'high';
 
             if (currentMode === 'pure') {
-                if (!pureFullSVG) throw new Error('Сначала загрузите SVG-макет.');
                 const blob = new Blob([pureFullSVG], { type: 'image/svg+xml;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 try {
@@ -771,7 +861,6 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
                 return { canvas, cssW: W, cssH: H };
             }
 
-            // Генератор: рисуем нативно
             ctx.save();
             ctx.scale(scale, scale);
             await drawGeneratorFlat(ctx, W, H);
@@ -980,22 +1069,126 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
             setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
 
-        // === SVG: тот же 3D-варп, упакованный в реальный SVG-файл ===
-        // SVG получает перспективное искажение через встроенный PNG (<image href="data:...">).
-        // Это даёт WYSIWYG: открывается одинаково в Figma / Illustrator / браузерах / iOS Preview
-        // и форма стикера совпадает с превью. Чистого вектора с настоящей 3D-перспективой в
-        // SVG не сделать (SVG поддерживает только 2D affine), поэтому самый честный способ —
-        // вектор-обёртка вокруг растрового результата того же 3D-расчёта что и PNG.
-        async function exportSceneSvg() {
-            const warped = await buildPerspectiveCanvas();
-            const pngBlob = await canvasToBlob(warped, 'image/png');
-            const pngDataUrl = await blobToDataUrl(pngBlob);
+        // === SVG: настоящий вектор-меш с 3D-перспективой ===
+        // SVG в принципе не поддерживает projective transform (только 2D affine, 6 параметров),
+        // поэтому «настоящую» перспективу делаем сеткой маленьких треугольников: для каждой ячейки
+        // меша считаем тот же аффинный матричный переход что и в PNG-варпе, и применяем его к одному
+        // встроенному <image> с плоским растром стикера. Каждая ячейка ограничена своим <clipPath>.
+        // На выходе получается реальный SVG-файл, который во всех современных вьюверах рендерится
+        // ровно как превью на странице.
+        function buildAffineMatrix(sx0, sy0, sx1, sy1, sx2, sy2, dx0, dy0, dx1, dy1, dx2, dy2) {
+            const denom = (sx1 - sx0) * (sy2 - sy0) - (sx2 - sx0) * (sy1 - sy0);
+            if (Math.abs(denom) < 1e-9) return null;
+            const a = ((dx1 - dx0) * (sy2 - sy0) - (dx2 - dx0) * (sy1 - sy0)) / denom;
+            const c = ((dx2 - dx0) * (sx1 - sx0) - (dx1 - dx0) * (sx2 - sx0)) / denom;
+            const e = dx0 - a * sx0 - c * sy0;
+            const b = ((dy1 - dy0) * (sy2 - sy0) - (dy2 - dy0) * (sy1 - sy0)) / denom;
+            const d = ((dy2 - dy0) * (sx1 - sx0) - (dy1 - dy0) * (sx2 - sx0)) / denom;
+            const f = dy0 - b * sx0 - d * sy0;
+            return [a, b, c, d, e, f];
+        }
 
-            const W = warped.width;
-            const H = warped.height;
+        // Сетка для SVG-варпа делается мельче чем для PNG: меньше клеток → SVG-файл меньше,
+        // и при умеренных углах перспективы аппроксимация всё равно практически неотличима.
+        const SVG_WARP_GRID = 18;
+
+        async function exportSceneSvg() {
+            const flat = await rasterizeFlatTarget();
+            if (!flat || !flat.canvas.width || !flat.canvas.height) {
+                throw new Error('Не удалось подготовить макет для SVG.');
+            }
+            const { cssW, cssH, canvas: flatCanvas } = flat;
+
+            // Один плоский растр стикера встраиваем в SVG как самостоятельный <image>.
+            // Все ячейки меша ссылаются на него через <use> + transform/clip.
+            const flatBlob = await canvasToBlob(flatCanvas, 'image/png');
+            const flatDataUrl = await blobToDataUrl(flatBlob);
+
+            const settings = getTransformSettings();
+            const grid = SVG_WARP_GRID;
+
+            const verts = [];
+            for (let j = 0; j <= grid; j++) {
+                const row = [];
+                for (let i = 0; i <= grid; i++) {
+                    row.push(projectPoint((i / grid) * cssW, (j / grid) * cssH, cssW, cssH, settings));
+                }
+                verts.push(row);
+            }
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const row of verts) for (const p of row) {
+                if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+            }
+
+            const pad = EXPORT_PADDING;
+            const outW = Math.ceil(maxX - minX + pad * 2);
+            const outH = Math.ceil(maxY - minY + pad * 2);
+            const offX = -minX + pad, offY = -minY + pad;
+
+            if (outW < 4 || outH < 4) {
+                throw new Error('Стикер слишком мал — нечего экспортировать.');
+            }
+
+            // Собираем определения clip-path и используемые ячейки.
+            const fmt = (n) => Number(n.toFixed(3));
+            const clipParts = [];
+            const useParts = [];
+            let nextId = 0;
+
+            for (let j = 0; j < grid; j++) {
+                for (let i = 0; i < grid; i++) {
+                    const u0c = (i / grid) * cssW;
+                    const v0c = (j / grid) * cssH;
+                    const u1c = ((i + 1) / grid) * cssW;
+                    const v1c = ((j + 1) / grid) * cssH;
+
+                    const tl = verts[j][i],     tr = verts[j][i + 1];
+                    const bl = verts[j + 1][i], br = verts[j + 1][i + 1];
+
+                    const dtl = [tl.x + offX, tl.y + offY];
+                    const dtr = [tr.x + offX, tr.y + offY];
+                    const dbl = [bl.x + offX, bl.y + offY];
+                    const dbr = [br.x + offX, br.y + offY];
+
+                    const tris = [
+                        { sx: [u0c, u1c, u0c], sy: [v0c, v0c, v1c], d: [dtl, dtr, dbl] },
+                        { sx: [u1c, u1c, u0c], sy: [v0c, v1c, v1c], d: [dtr, dbr, dbl] }
+                    ];
+
+                    for (const t of tris) {
+                        const m = buildAffineMatrix(
+                            t.sx[0], t.sy[0], t.sx[1], t.sy[1], t.sx[2], t.sy[2],
+                            t.d[0][0], t.d[0][1], t.d[1][0], t.d[1][1], t.d[2][0], t.d[2][1]
+                        );
+                        if (!m) continue;
+                        // Слегка расширяем клип чтобы не было видимых швов между треугольниками.
+                        const cxT = (t.d[0][0] + t.d[1][0] + t.d[2][0]) / 3;
+                        const cyT = (t.d[0][1] + t.d[1][1] + t.d[2][1]) / 3;
+                        const fatten = 0.75;
+                        const pts = t.d.map(([x, y]) => {
+                            const vx = x - cxT, vy = y - cyT;
+                            const len = Math.hypot(vx, vy) || 1;
+                            return `${fmt(x + vx / len * fatten)},${fmt(y + vy / len * fatten)}`;
+                        }).join(' ');
+
+                        const id = 'c' + (nextId++);
+                        clipParts.push(`<clipPath id="${id}"><polygon points="${pts}"/></clipPath>`);
+                        useParts.push(`<g clip-path="url(#${id})"><use href="#flat" transform="matrix(${m.map(fmt).join(' ')})"/></g>`);
+                    }
+                }
+            }
+
             const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <image x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none" href="${pngDataUrl}" xlink:href="${pngDataUrl}"/>
+<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" width="${outW}" height="${outH}" viewBox="0 0 ${outW} ${outH}">
+  <defs>
+    <symbol id="flat" overflow="visible">
+      <image x="0" y="0" width="${cssW}" height="${cssH}" preserveAspectRatio="none" href="${flatDataUrl}" xlink:href="${flatDataUrl}"/>
+    </symbol>
+    ${clipParts.join('\n    ')}
+  </defs>
+  ${useParts.join('\n  ')}
 </svg>`;
             downloadBlob(`Sber-Warper-${Date.now()}.svg`, svg, 'image/svg+xml;charset=utf-8');
         }
@@ -1030,6 +1223,8 @@ h1, h2, h3, b, strong { font-weight: 600 !important; }
         // Подсветка дефолтных пресетов
         highlightGenPreset('balanced');
         highlightViewPreset('layout');
+        // Показать рамку «Область экспорта» сразу после первой раскладки
+        requestAnimationFrame(updateExportFrame);
     </script>
 </body>
 </html>
